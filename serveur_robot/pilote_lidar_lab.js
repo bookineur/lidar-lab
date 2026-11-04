@@ -60,7 +60,7 @@
     const q = (id) => document.getElementById(id);
     const msg = (t) => (q("rwMsg").textContent = t);
     q("rwSpeed").oninput = () => (q("rwSpeedV").textContent = q("rwSpeed").value + " %");
-    q("rwPhone").textContent = "Téléphone : connecte-le au Wi-Fi Robot-LiDAR et ouvre http://192.168.4.1 (renvoi automatique vers ce PC).";
+    q("rwPhone").textContent = "Téléphone : connecte-le au même réseau local que le PC et ouvre l’adresse « Téléphone » affichée par le serveur. Le PC peut être relié à la box par Ethernet.";
 
     // ---------- pilotage ----------
     const held = new Set();

@@ -9,7 +9,7 @@
 //    de Lidar Lab (lidar_core.js) et met à jour poses.json et grid_map.csv
 //  - Lidar Lab et le téléphone voient la même séance en direct
 //
-//  Lancer (PC sur le même Wi-Fi que le robot : ton Wi-Fi, ou « Robot-LiDAR ») :
+//  Lancer (PC et robot sur le même réseau local : PC en Ethernet accepté) :
 //      node serveur_robot/serveur.js
 //  Options : --robot auto (défaut) ou http://192.168.1.37   --port 8000   --dossier C:\chemin\des\seances
 //  Aucune dépendance à installer. Aucune donnée n'est envoyée sur internet.
@@ -129,7 +129,7 @@ async function keepRobotFound() {
     if (found) {
       ROBOT = found;
       robotLastSeen = Date.now();
-    } else if (!ROBOT) console.log("Robot introuvable pour l’instant (même Wi-Fi que le PC ? robot allumé ?) — nouvel essai dans 5 s.");
+    } else if (!ROBOT) console.log("Robot introuvable pour l’instant (même réseau local que le PC ? robot allumé ? Wi-Fi invité/isolation client désactivée ?) — nouvel essai dans 5 s.");
   } finally {
     searching = false;
   }
