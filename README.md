@@ -4,7 +4,7 @@ Application locale, sans installation ni serveur, pour afficher et assembler vis
 
 ## Lancer
 
-Pour l’usage hors ligne, ouvrir `index.html` dans un navigateur récent et charger des CSV. Pour la capture USB LD06, servir ce dossier sur `http://localhost` (ex. `python -m http.server 8000`) et utiliser Chrome ou Edge. Pour une ESP32, utiliser `C:\Users\HP\TP-cartographie\arduino\ESP32_LD06_CSV_intensite\ESP32_LD06_CSV_intensite.ino` (Serial2, RX GPIO33, PWM GPIO32); `LD06_capture.ino` convient au câblage Serial1 correspondant. La sortie doit être CSV `printScanCSV`, pas Teleplot. Brancher la carte, cliquer « Connecter au robot » une fois et autoriser le port série à 921600 bauds. À chaque position, immobiliser le robot et cliquer « Prendre le scan suivant »; l’option activée ancre le premier scan à l’origine puis recale les suivants sur la carte cumulée. Si une grid map est déjà chargée, elle localise le premier scan. Sélectionner une ligne et cliquer « Exporter le CSV brut du scan sélectionné » pour enregistrer sa mesure originale; déconnecter après le relevé. Les fichiers restent dans le navigateur; aucune donnée n’est envoyée en ligne.
+Pour l’usage hors ligne, ouvrir `index.html` dans un navigateur récent et charger des CSV. Pour la capture USB LD06, servir ce dossier sur `http://localhost` (ex. `python -m http.server 8000`) et utiliser Chrome ou Edge. Pour une ESP32, utiliser `C:\Users\HP\TP-cartographie\arduino\ESP32_LD06_CSV_intensite\ESP32_LD06_CSV_intensite.ino` (Serial2, RX GPIO33, PWM GPIO32); `LD06_capture.ino` convient au câblage Serial1 correspondant. La sortie doit être CSV `printScanCSV`, pas Teleplot. Brancher la carte, cliquer « Connecter au robot » une fois et autoriser le port série à 921600 bauds. À chaque position, immobiliser le robot et observer l’aperçu en direct puis cliquer « Capturer le scan affiché »; l’option activée ancre le premier scan à l’origine puis recale les suivants sur la carte cumulée. Si une grid map est déjà chargée, elle localise le premier scan. Sélectionner une ligne et cliquer « Exporter le CSV brut du scan sélectionné » pour enregistrer sa mesure originale; déconnecter après le relevé. Les fichiers restent dans le navigateur; aucune donnée n’est envoyée en ligne.
 
 Formats de scans pris en charge (délimiteurs virgule ou point-virgule; décimales point, et virgule pour les fichiers séparés par point-virgule) :
 
@@ -15,6 +15,23 @@ Formats de scans pris en charge (délimiteurs virgule ou point-virgule; décimal
 - Nuage fusionné cartésien : colonnes `x_m,y_m` (par exemple `scans_fusionnes.csv`).
 
 Un fichier de poses JSON du projet peut être chargé. Pour le scan sélectionné, le bouton « Utiliser pose connue » reprend sa pose `[x_m, y_m, theta_deg]`.
+
+## Relevé incrémental et méthode SLAM
+
+Le flux d’utilisation est « observer → capturer → recaler → intégrer → déplacer un peu → recommencer ». L’aperçu USB est actualisé à chaque tour CSV complet du LiDAR; le blanc identifie le tour affiché, qui n’est pas encore ajouté à la carte. Le bouton capture ce tour sans attendre le suivant. Si la forme n’est pas stable ou lisible, attendre le prochain tour avant de cliquer.
+
+Le premier scan devient le repère local (x=0, y=0, θ=0°). Pour chaque scan suivant, l’application cherche sa pose sur la grid map formée par les scans déjà intégrés. Elle compare les points transformés aux cellules occupées, mesure le recouvrement et rejette une pose si le recouvrement minimal n’est pas atteint ou si une autre pose est presque aussi bonne. Un scan accepté ajoute ses retours à la carte; un scan refusé reste hors carte afin d’éviter de propager une pose incertaine. Continuer par petits déplacements avec des murs déjà cartographiés visibles dans le scan.
+
+C’est une **construction incrémentale de carte avec scan matching LiDAR** et une démonstration pédagogique d’une partie du SLAM 2D. Ce n’est pas une implémentation complète de Cartographer : la V1 ne possède ni odométrie codeur/IMU, ni graphe de poses, ni fermeture de boucle, ni optimisation qui corrige rétroactivement toute la trajectoire. Les poses sont relatives au premier scan et le drift peut donc s’accumuler. Cette distinction correspond à l’architecture décrite par Cartographer : scan matching local contre des sous-cartes, puis graphe global et contraintes de fermeture de boucle pour corriger la dérive ([article Google Cartographer](https://research.google/pubs/real-time-loop-closure-in-2d-lidar-slam/), [documentation du scan matcher 2D](https://google-cartographer.github.io/cartographer/configuration_files/trajectory_builder_2d.html)).
+
+### Essai avec le robot
+
+1. Démarrer la V1 sur localhost dans Chrome ou Edge; téléverser le sketch ESP32 qui envoie le CSV `printScanCSV`; fermer le moniteur série Arduino.
+2. Connecter le port série. Attendre l’aperçu blanc d’un tour complet; tourner le robot sur place ou le déplacer un peu pour reconnaître la salle.
+3. Capturer le premier scan pour fixer l’origine. Le résultat donne un repère local, pas la position absolue dans le bâtiment.
+4. Déplacer le robot d’une petite distance en gardant des murs communs, attendre que le nouveau contour se stabilise, puis capturer. Vérifier la pose X/Y/θ et l’alignement avant de poursuivre.
+5. Si le recalage est refusé, ne pas forcer l’intégration automatique : rapprocher le robot d’une zone déjà vue ou saisir une pose mesurée; un espace sans mur commun ne permet pas d’estimer le déplacement par LiDAR seul.
+6. Répéter jusqu’à couvrir la salle. Exporter la grid map et les poses pour conserver le résultat. Une vraie validation de SLAM nécessitera de comparer les poses et la carte à des mesures terrain indépendantes.
 
 ## Utilisation
 
@@ -56,7 +73,7 @@ Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e3795
 ## Limites
 
 - La capture directe est prévue pour une carte avec le sketch CSV `LD06_capture`; le navigateur ne décode pas le protocole binaire LD06 via adaptateur USB-UART.
-- La localisation globale sur grid map estime une pose pour un scan chargé; elle n’assure pas encore le suivi continu du robot. Les ICP et recalages locaux nécessitent une pose de départ proche.
+- Le flux série donne un aperçu à chaque tour; le recalage et l’ajout à la carte se font à la demande, lorsque l’utilisateur capture. Il n’y a pas de commande moteur ni d’odométrie intégrée.
 - La qualité doit être validée avec des poses terrain indépendantes; les zones symétriques, les obstacles mobiles, l’origine de grille et le mouvement pendant un tour LiDAR peuvent fausser l’estimation.
 - Le filtre temporel garde le scan initial intact : une personne présente dans ce scan reste dans la carte. Une personne immobile au même endroit dans deux scans est confirmée comme un mur.
 - Sans mur commun avec la carte, la localisation globale ne peut pas savoir où est le robot : le scan est refusé (ou, si une autre pièce ressemble à une pièce déjà cartographiée, il pourrait être mal placé); il faut alors saisir la pose.

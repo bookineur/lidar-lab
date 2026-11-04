@@ -66,13 +66,26 @@ test("USB 2b. en-tête printScanCSV envoyé une seule fois : les scans suivants 
   assert.ok(h.app.scans[1].hasIntensity);
   assert.equal(h.app.scans[1].rawCsv, headerless.split("\r\n").filter(Boolean).join("\n"));
 });
-test("USB 3. tour reçu avant le clic : ignoré, on garde le tour suivant", async () => {
-  const { h, fake } = await connected();
-  fake.send(frame([4.2, 2.0, 30], 401)); // le robot n'est pas encore à sa place
+test("USB 2c. aperçu du dernier tour reçu : le clic capture immédiatement le scan affiché", async () => {
+  const { h, fake } = await connected(), previewFrame = frame([1.5, 2.0, 0], 359);
+  const fillsBefore = h.ctx.fills;
+  fake.send(previewFrame);
   await settle();
-  await capture(h, fake, frame([1.5, 2.0, 0], 402));
+  assert.ok(h.ctx.fills > fillsBefore, "le rendu canvas a été actualisé à la réception du tour");
+  assert.match(h.$("captureStatus").textContent, /Aperçu LiDAR en direct/);
+  await h.click("captureUsb");
   assert.equal(h.app.scans.length, 1);
-  assert.equal(h.app.scans[0].rawCsv, frame([1.5, 2.0, 0], 402).split("\r\n").filter((l) => l).join("\n"));
+  assert.equal(h.app.scans[0].pts.length, 450);
+  assert.equal(h.app.scans[0].mapRegistered, true);
+});
+test("USB 3. le dernier tour reçu avant le clic reste affiché et peut être capturé", async () => {
+  const { h, fake } = await connected();
+  const displayed = frame([4.2, 2.0, 30], 401);
+  fake.send(displayed);
+  await settle();
+  await h.click("captureUsb");
+  assert.equal(h.app.scans.length, 1);
+  assert.equal(h.app.scans[0].rawCsv, displayed.split("\r\n").filter((l) => l).join("\n"));
 });
 
 test("USB 4. connexion au milieu d'un tour : le morceau sans en-tête n'est pas pris pour un scan", async () => {
