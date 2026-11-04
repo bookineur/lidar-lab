@@ -199,9 +199,9 @@ test("9d. export de la grid map indépendant de la taille du canvas", async () =
   assert.ok((h.lastDownload("grid_map.csv") || "").split("\n").length > 10);
 });
 
-test("10. chargement jusqu’à 30 scans par session, les fichiers excédentaires sont signalés", async () => {
+test("10. chargement jusqu’à 50 scans par session, les fichiers excédentaires sont signalés", async () => {
   const h = loadApp(APP), csv = "angle_deg,distance_mm,intensity\n0,1000,120\n";
-  await h.loadFiles(Array.from({ length: 31 }, (_, i) => ({ name: `scan_${i + 1}.csv`, text: csv })));
-  assert.equal(h.app.scans.length, 30);
-  assert.match(h.$("notice").textContent, /1 scan\(s\) ignoré\(s\): limite de 30 scans/);
+  await h.loadFiles(Array.from({ length: 51 }, (_, i) => ({ name: `scan_${i + 1}.csv`, text: csv })));
+  assert.equal(h.app.scans.length, 50);
+  assert.match(h.$("notice").textContent, /1 scan\(s\) ignoré\(s\): limite de 50 scans/);
 });

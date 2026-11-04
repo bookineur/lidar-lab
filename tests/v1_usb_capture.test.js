@@ -34,12 +34,12 @@ test("USB 1. connexion : port ouvert à 921600 bauds, boutons activés", async (
   assert.match(h.$("captureStatus").textContent, /Connecté à 921600 bauds/);
 });
 
-test("USB 1b. la session autorise 30 scans et bloque proprement le 31e", async () => {
+test("USB 1b. la session autorise 50 scans et bloque proprement le 51e", async () => {
   const { h } = await connected(), csv = "angle_deg,distance_mm,intensity\n0,1000,120\n";
-  for (let i = 0; i < 30; i++) h.app.scans.push(h.app.parseCsv(csv, `scan_${i + 1}.csv`));
+  for (let i = 0; i < 50; i++) h.app.scans.push(h.app.parseCsv(csv, `scan_${i + 1}.csv`));
   await h.click("captureUsb");
-  assert.equal(h.app.scans.length, 30);
-  assert.match(h.$("captureStatus").textContent, /Limite de 30 scans atteinte/);
+  assert.equal(h.app.scans.length, 50);
+  assert.match(h.$("captureStatus").textContent, /Limite de 50 scans atteinte/);
 });
 
 test("USB 2. trois captures : premier scan ancré, suivants recalés, CSV brut exportable", async () => {
