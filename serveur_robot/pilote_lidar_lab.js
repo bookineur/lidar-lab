@@ -50,8 +50,9 @@
 <div class="row"><label>Vitesse</label><input type="range" id="rwSpeed" min="20" max="100" value="40" style="flex:1"><span class="sub" id="rwSpeedV">40 %</span></div>
 <div class="actions"><button type="button" data-turn="45">⟲ 45°</button><button type="button" data-turn="15">⟲ 15°</button><button type="button" data-turn="-15">15° ⟳</button><button type="button" data-turn="-45">45° ⟳</button></div>
 <label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwLive" checked> Aperçu LiDAR en direct dans la vue</label>
+<label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwAuto"> Auto-SLAM : après chaque déplacement, prendre un scan et l’ajouter si le recalage est fiable</label>
 <div class="actions"><button type="button" class="primary" id="rwCapture">Capturer et ajouter à la carte</button><button type="button" id="rwUndo">Annuler le dernier scan</button><button type="button" id="rwRelocate">Recalculer les poses</button><button type="button" id="rwNew">Nouvelle séance</button></div>
-<div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus et ajoutés automatiquement à la liste.</div>
+<div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus. En Auto-SLAM, chaque arrêt après déplacement lance une capture et un recalage; les poses incertaines restent hors de la carte.</div>
 <div class="sub" id="rwPhone" style="margin-top:6px"></div>`;
     const first = document.querySelector("aside .card");
     if (first && first.parentNode) first.parentNode.insertBefore(card, first.nextSibling);
@@ -65,7 +66,9 @@
     const held = new Set();
     let stops = 0,
       busyDrive = false,
-      busy = false;
+      busy = false,
+      autoCaptureTimer = null,
+      autoCaptureBusy = false;
     function speeds() {
       const v = +q("rwSpeed").value,
         f = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0),
@@ -89,14 +92,52 @@
       } catch (e) {}
       busyDrive = false;
     }, 120);
-    const press = (k) => held.add(k),
+    function scheduleAutoCapture() {
+      if (!q("rwAuto").checked) return;
+      if (autoCaptureTimer) clearTimeout(autoCaptureTimer);
+      autoCaptureTimer = setTimeout(async () => {
+        autoCaptureTimer = null;
+        if (!q("rwAuto").checked || held.size || autoCaptureBusy || busy) return;
+        autoCaptureBusy = true;
+        busy = true;
+        q("rwCapture").disabled = true;
+        card.querySelectorAll(".actions button").forEach((b) => (b.disabled = true));
+        msg("Robot arrêté · attente du tour LiDAR complet, puis recalage sur la carte…");
+        try {
+          const r = await post("/api/capture");
+          await sync(r.session);
+          const n = r.session.scans.length;
+          select(scans.findIndex((s) => s.serverName === r.scan.name));
+          msg(r.ok
+            ? "Auto-SLAM · scan " + n + " intégré : " + r.scan.note + ". Tu peux déplacer le robot."
+            : "Auto-SLAM · scan " + n + " conservé mais non intégré : " + r.scan.note + ". Reviens vers une zone déjà cartographiée puis déplace-toi à nouveau.");
+        } catch (e) {
+          msg("Auto-SLAM · capture impossible : " + e.message + ". Vérifie la connexion du robot puis réessaie.");
+        } finally {
+          autoCaptureBusy = false;
+          busy = false;
+          card.querySelectorAll(".actions button").forEach((b) => (b.disabled = false));
+        }
+      }, 500);
+    }
+    const press = (k) => {
+      if (autoCaptureTimer) clearTimeout(autoCaptureTimer);
+      autoCaptureTimer = null;
+      held.add(k);
+    },
       unpress = (k) => {
-        if (held.delete(k) && !held.size) stops = 3;
+        if (held.delete(k) && !held.size) {
+          stops = 3;
+          scheduleAutoCapture();
+        }
       };
-    function stopNow() {
+    function stopNow(captureAfterStop = false) {
+      const wasMoving = held.size > 0;
       held.clear();
       stops = 0;
-      return get("/api/robot/stop", 800).catch(() => {});
+      const stopped = get("/api/robot/stop", 800).catch(() => {});
+      if (wasMoving && captureAfterStop) scheduleAutoCapture();
+      return stopped;
     }
     card.querySelectorAll("[data-move]").forEach((b) => {
       const k = b.dataset.move;
@@ -106,14 +147,14 @@
       });
       for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) b.addEventListener(ev, () => unpress(k));
     });
-    q("rwStop").onclick = stopNow;
+    q("rwStop").onclick = () => stopNow(true);
     const KEYS = { ArrowUp: "up", z: "up", Z: "up", w: "up", ArrowDown: "down", s: "down", S: "down", ArrowLeft: "left", q: "left", Q: "left", a: "left", ArrowRight: "right", d: "right", D: "right" };
     const typing = () => /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement || {}).tagName || "") && document.activeElement.type !== "checkbox" && document.activeElement.type !== "range";
     addEventListener("keydown", (e) => {
       if (!q("rwKeys").checked || typing()) return;
       if (e.key === " ") {
         e.preventDefault();
-        stopNow();
+        stopNow(true);
         return;
       }
       if (KEYS[e.key]) {
@@ -122,14 +163,15 @@
       }
     });
     addEventListener("keyup", (e) => KEYS[e.key] && unpress(KEYS[e.key]));
-    addEventListener("blur", () => held.size && (held.clear(), (stops = 3)));
+    addEventListener("blur", () => held.size && (held.clear(), (stops = 3), scheduleAutoCapture()));
     card.querySelectorAll("[data-turn]").forEach(
       (b) =>
         (b.onclick = async () => {
-          await stopNow();
+          await stopNow(false);
           try {
             const ms = await get("/api/robot/turn?deg=" + b.dataset.turn, 1500);
             msg("Rotation de " + Math.abs(+b.dataset.turn) + "° (" + ms + " ms). L’angle exact sera retrouvé par le recalage.");
+            scheduleAutoCapture();
           } catch (e) {
             msg("Rotation impossible : " + e.message);
           }
@@ -237,7 +279,7 @@
     }
     q("rwCapture").onclick = () =>
       act(async () => {
-        await stopNow();
+        await stopNow(false);
         const r = await post("/api/capture");
         await sync(r.session);
         const n = r.session.scans.length;
