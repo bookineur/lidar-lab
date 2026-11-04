@@ -92,7 +92,9 @@
       } catch (e) {}
       busyDrive = false;
     }, 120);
-    function scheduleAutoCapture() {
+    // delay : attente avant la capture ; après une rotation chronométrée, il faut laisser la rotation finir,
+    // sinon le /stop envoyé par la capture la coupe en plein mouvement.
+    function scheduleAutoCapture(delay = 500) {
       if (!q("rwAuto").checked) return;
       if (autoCaptureTimer) clearTimeout(autoCaptureTimer);
       autoCaptureTimer = setTimeout(async () => {
@@ -118,9 +120,14 @@
           busy = false;
           card.querySelectorAll(".actions button").forEach((b) => (b.disabled = false));
         }
-      }, 500);
+      }, delay);
     }
     const press = (k) => {
+      // pas de déplacement pendant une capture : le robot doit rester immobile pendant les tours du LiDAR
+      if (busy || autoCaptureBusy) {
+        msg("Capture en cours : attends la fin du recalage avant de déplacer le robot.");
+        return;
+      }
       if (autoCaptureTimer) clearTimeout(autoCaptureTimer);
       autoCaptureTimer = null;
       held.add(k);
@@ -171,7 +178,7 @@
           try {
             const ms = await get("/api/robot/turn?deg=" + b.dataset.turn, 1500);
             msg("Rotation de " + Math.abs(+b.dataset.turn) + "° (" + ms + " ms). L’angle exact sera retrouvé par le recalage.");
-            scheduleAutoCapture();
+            scheduleAutoCapture((+ms || 0) + 500); // durée de la rotation + rampe d'arrêt (120 ms) + marge
           } catch (e) {
             msg("Rotation impossible : " + e.message);
           }
