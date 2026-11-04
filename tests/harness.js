@@ -122,6 +122,7 @@ function loadApp(htmlFile = "index.html", options = {}) {
     TextDecoder,
     performance,
     console,
+    fetch: options.fetch || (() => Promise.reject(new Error("fetch unavailable in test"))),
     // vraies minuteries, plafonnées à 1 s (le délai d'attente de 15 s de la capture dure donc 1 s en test)
     setTimeout: (f, ms) => setTimeout(f, Math.min(Number(ms) || 0, 1000)),
     clearTimeout,

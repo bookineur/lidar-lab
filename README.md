@@ -16,6 +16,15 @@ Formats de scans pris en charge (délimiteurs virgule ou point-virgule; décimal
 
 Un fichier de poses JSON du projet peut être chargé. Pour le scan sélectionné, le bouton « Utiliser pose connue » reprend sa pose `[x_m, y_m, theta_deg]`.
 
+## Connexion Wi-Fi sans câble
+
+Le sketch ESP32_robot_wifi_v2.ino crée le point d’accès Robot-LiDAR (mot de passe lidar2026) à l’adresse http://192.168.4.1. Il expose le dernier tour complet via GET /scan avec un identifiant de scan et l’en-tête CORS attendu par l’application.
+
+1. Téléverser ce sketch sur l’ESP32 qui reçoit le LD06, puis connecter le PC au Wi-Fi Robot-LiDAR.
+2. Lancer Lidar Lab sur http://localhost dans Chrome ou Edge. Garder le port de l’application sur localhost : le navigateur exige un contexte sécurisé pour contacter les appareils du réseau local.
+3. Dans « Connexion Wi-Fi au robot ESP32 », garder http://192.168.4.1 ou saisir l’adresse du robot si le sketch utilise une autre adresse; cliquer « Connecter en Wi-Fi » et autoriser le réseau local si le navigateur le demande.
+4. L’aperçu se rafraîchit par lecture HTTP des nouveaux tours. Capturer le tour affiché pour estimer la pose et l’ajouter à la carte cumulée, comme en USB. La liaison Wi-Fi de Lidar Lab reçoit les mesures; elle ne pilote pas les moteurs depuis cette page.
+
 ## Relevé incrémental et méthode SLAM
 
 Le flux d’utilisation est « observer → capturer → recaler → intégrer → déplacer un peu → recommencer ». L’aperçu USB est actualisé à chaque tour CSV complet du LiDAR; le blanc identifie le tour affiché, qui n’est pas encore ajouté à la carte. Le bouton capture ce tour sans attendre le suivant. Si la forme n’est pas stable ou lisible, attendre le prochain tour avant de cliquer.
@@ -68,7 +77,7 @@ node --test "tests/*.test.js"
 node tests/rapport_simulation.js
 ```
 
-Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e37950a.html`) et la version actuelle et écrit `tests/resultats_simulation.md`. Des scans simulés prêts à charger sont dans `tests/donnees_simulees/` (préfixe `SIM_`). `tests/v1_usb_capture.test.js` vérifie la capture USB avec un **faux port série** qui imite la sortie de `LD06_capture` (tours CSV découpés en paquets, connexion en milieu de tour, délai dépassé, câble débranché, déconnexion) : cela teste le logiciel, pas le câble, la carte ni le LD06 réels.
+Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e37950a.html`) et la version actuelle et écrit `tests/resultats_simulation.md`. Des scans simulés prêts à charger sont dans `tests/donnees_simulees/` (préfixe `SIM_`). `tests/v1_usb_capture.test.js` vérifie l’aperçu et la capture USB avec un **faux port série**, ainsi que la lecture Wi-Fi de `/scan` avec une réponse HTTP simulée. Les simulations testent le logiciel, pas le réseau du robot, le câble, la carte ni le LD06 réels.
 
 ## Limites
 

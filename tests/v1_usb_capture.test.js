@@ -9,6 +9,7 @@ const SC = require("./scenarios");
 
 const APP = "index.html";
 const frame = (pose, seed, circles = [SC.PILLAR]) => SC.S.toCsv(SC.S.simulateScan({ pose, walls: SC.ROOM, circles, seed }), "printScanCSV");
+const wifiFrame = (id) => "# robot_wifi id=" + id + " hz=10.0 pts=90 pwm=40\nangle_deg,distance_mm,intensity\n" + Array.from({ length: 90 }, (_, i) => `${i * 4},2000,180`).join("\n") + "\n";
 
 async function connected() {
   const fake = fakeSerial(),
@@ -40,6 +41,23 @@ test("USB 1b. la session autorise 50 scans et bloque proprement le 51e", async (
   await h.click("captureUsb");
   assert.equal(h.app.scans.length, 50);
   assert.match(h.$("captureStatus").textContent, /Limite de 50 scans atteinte/);
+});
+
+test("Wi-Fi 1. connexion à ESP32_robot_wifi_v2 : aperçu HTTP et capture localisée sans USB", async () => {
+  const requests = [], h = loadApp(APP, { fetch: async (url, options) => {
+    requests.push({ url, options });
+    return { ok: true, text: async () => wifiFrame(17) };
+  } });
+  await h.click("connectWifi");
+  await settle();
+  assert.match(h.$("wifiStatus").textContent, /aperçu en direct/);
+  assert.match(requests[0].url, /^http:\/\/192\.168\.4\.1\/scan\?ts=/);
+  assert.equal(requests[0].options.targetAddressSpace, "local");
+  await h.click("captureUsb");
+  assert.equal(h.app.scans.length, 1);
+  assert.equal(h.app.scans[0].pts.length, 90);
+  assert.equal(h.app.scans[0].mapRegistered, true);
+  await h.click("disconnectWifi");
 });
 
 test("USB 2. trois captures : premier scan ancré, suivants recalés, CSV brut exportable", async () => {
