@@ -348,7 +348,7 @@ function loadRobotPanel(options = {}) {
       document, fetch, console, URL, AbortController, setTimeout: timer, clearTimeout: clearTimer,
       setInterval: interval, clearInterval: clearIntervalFake,
       addEventListener(name, fn) { (listeners.get(name) || (listeners.set(name, []), listeners.get(name))).push(fn); },
-      scans, active: 0, MAX_SCANS: 50, serialFrameCounter: 0, livePreviewScan: null,
+      scans, active: 0, MAX_SCANS: 200, serialFrameCounter: 0, livePreviewScan: null,
       parseCsv(text, name) { return { name, pts: text.split("\n").filter((line) => /^\d/.test(line)).map((_, i) => ({ x: Math.cos(i), y: Math.sin(i), a: i * 6, r: 1, i: 200 })), pose: [0, 0, 0], visible: true, mapRegistered: false }; },
       renderSelectors() { renderCount++; }, draw() {}, select(i) { selected = i; context.active = i; },
       sleep: undefined,
