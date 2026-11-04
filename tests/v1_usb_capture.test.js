@@ -56,6 +56,16 @@ test("USB 2. trois captures : premier scan ancré, suivants recalés, CSV brut e
   assert.equal(h.lastDownload(scans[1].name), expected);
 });
 
+test("USB 2b. en-tête printScanCSV envoyé une seule fois : les scans suivants restent correctement lus", async () => {
+  const { h, fake } = await connected(), pose = [1.5, 2.0, 0], full = frame(pose, 351), headerless = full.replace(/^N,Angle,Distance,Intensity,x,y\r?\n/, "");
+  await capture(h, fake, full);
+  await capture(h, fake, headerless);
+  assert.equal(h.app.scans.length, 2);
+  assert.equal(h.app.scans[0].pts.length, 450);
+  assert.equal(h.app.scans[1].pts.length, 450);
+  assert.ok(h.app.scans[1].hasIntensity);
+  assert.equal(h.app.scans[1].rawCsv, headerless.split("\r\n").filter(Boolean).join("\n"));
+});
 test("USB 3. tour reçu avant le clic : ignoré, on garde le tour suivant", async () => {
   const { h, fake } = await connected();
   fake.send(frame([4.2, 2.0, 30], 401)); // le robot n'est pas encore à sa place
