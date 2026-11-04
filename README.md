@@ -26,7 +26,7 @@ Un fichier de poses JSON du projet peut être chargé. Pour le scan sélectionn�
 5. Zoomer avec la molette; déplacer la vue avec le bouton central de la souris. « Recadrer » réinitialise le zoom et centre à nouveau tous les scans visibles.
 6. Les boutons « Annuler » et « Rétablir » restaurent les poses précédentes (jusqu’à 50 opérations).
 7. Pour une localisation sans pose initiale, charger la grid map via « Grid map CSV », puis un scan brut LiDAR (angles/distances) et cliquer « Localiser automatiquement sur la grid map ». La recherche globale essaie les positions et orientations sur toute la carte, puis affine le meilleur candidat. La pose estimée X/Y/θ est appliquée au scan et affichée avec une erreur moyenne et un indicateur de qualité; une carte symétrique peut produire plusieurs poses ambiguës. Si le CSV de carte ne fournit pas son origine, régler Origine X/Y avant la localisation.
-   Pour un relevé de salle incrémental, ancrer le premier scan à (0,0,0°), puis sélectionner chaque scan suivant et cliquer « Localiser sur la carte cumulée ». L’application recale ce scan sur les précédents intégrés; la grid map se construit au fur et à mesure. La pose est relative au premier scan, et non à un repère géographique absolu. Le nettoyage règle portée et intensité. Le filtre temporel garde le scan initial intact et masque les retours isolés des scans suivants; les zones nouvelles demandent un scan de confirmation. L’intensité n’identifie pas à elle seule une personne; calibre le seuil avec tes mesures. Si le score est faible ou plusieurs poses se ressemblent, le scan est refusé et masqué; prends un scan intermédiaire avec des murs déjà cartographiés pour éviter de déformer la carte.
+   Pour un relevé de salle incrémental, ancrer le premier scan à (0,0,0°), puis sélectionner chaque scan suivant et cliquer « Localiser sur la carte cumulée ». L’application recale ce scan sur les précédents intégrés; la grid map se construit au fur et à mesure. La pose est relative au premier scan, et non à un repère géographique absolu. Le nettoyage règle portée et intensité. Le filtre temporel garde le scan initial intact et masque les retours isolés des scans suivants; les zones nouvelles demandent un scan de confirmation. L’intensité n’identifie pas à elle seule une personne; calibre le seuil avec tes mesures. Le recalage est accepté si au moins « Recouvrement min » (35 % par défaut) des points du scan tombent à moins de 10 cm (ou 2 cellules) d’un mur déjà cartographié et si aucune autre pose ne donne un score proche : une personne ou une zone nouvelle ne fait donc plus refuser le scan. La carte qui sert de référence au recalage contient aussi les murs vus une seule fois (non encore confirmés), sinon le scan suivant ne pourrait jamais les confirmer; la carte affichée et exportée garde, elle, le filtre temporel. Si le recouvrement est trop faible ou plusieurs poses se ressemblent, le scan est refusé et masqué; prends un scan intermédiaire avec des murs déjà cartographiés pour éviter de déformer la carte. Sans aucun mur commun (autre pièce, couloir aveugle), aucun recalage automatique n’est possible : place le scan à la main (pose mesurée ou odométrie), puis « Intégrer à la pose saisie (sans recalage) »; les scans suivants de cette zone se recalent ensuite dessus. Un CSV sans colonne d’intensité (Teleplot, MapTool) n’est pas filtré par le seuil d’intensité.
    Pour un recalage local, choisir une référence et un scan cible; « Auto-aligner (ICP) » affine la pose du scan cible à partir de la pose actuelle. Le scan doit être placé à proximité de la bonne solution pour éviter un mauvais minimum local.
    « Recherche exhaustive Grid » retire temporairement le scan cible de la carte et recherche sa pose dans la fenêtre et avec le pas réglés dans les champs. Les autres scans visibles forment la grid map de référence, puis un raffinement local améliore le résultat.
    « Localiser sur carte vectorielle » fait la recherche avec les mêmes réglages en minimisant les distances point-segment vers les segments extraits des autres scans visibles.
@@ -42,9 +42,22 @@ Un fichier de poses JSON du projet peut être chargé. Pour le scan sélectionn�
 
 Le score est la distance quadratique moyenne de chaque point du scan cible transformé à son point le plus proche dans la référence transformée. Le taux indique la part des points sous le seuil choisi. Ces indicateurs sont pédagogiques : ils ne prouvent pas à eux seuls qu’une pose est correcte et peuvent être trompés par une géométrie répétitive ou des objets mobiles.
 
+## Tests automatisés (simulation)
+
+Les calculs (lecture CSV, filtres portée/intensité, filtre temporel, grid map, localisation) sont dans `lidar_core.js`, chargé par `index.html`. Les tests pilotent le vrai `index.html` dans Node avec un DOM simulé et des scans LD06 **synthétiques** (lancer de rayons, graine fixe) : ce ne sont pas des mesures du robot.
+
+```bash
+node --test "tests/*.test.js"
+node tests/rapport_simulation.js
+```
+
+Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e37950a.html`) et la version actuelle et écrit `tests/resultats_simulation.md`. Des scans simulés prêts à charger sont dans `tests/donnees_simulees/` (préfixe `SIM_`).
+
 ## Limites
 
 - La capture directe est prévue pour une carte avec le sketch CSV `LD06_capture`; le navigateur ne décode pas le protocole binaire LD06 via adaptateur USB-UART.
 - La localisation globale sur grid map estime une pose pour un scan chargé; elle n’assure pas encore le suivi continu du robot. Les ICP et recalages locaux nécessitent une pose de départ proche.
 - La qualité doit être validée avec des poses terrain indépendantes; les zones symétriques, les obstacles mobiles, l’origine de grille et le mouvement pendant un tour LiDAR peuvent fausser l’estimation.
+- Le filtre temporel garde le scan initial intact : une personne présente dans ce scan reste dans la carte. Une personne immobile au même endroit dans deux scans est confirmée comme un mur.
+- Sans mur commun avec la carte, la localisation globale ne peut pas savoir où est le robot : le scan est refusé (ou, si une autre pièce ressemble à une pièce déjà cartographiée, il pourrait être mal placé); il faut alors saisir la pose.
 - L’application ne commande pas le robot.
