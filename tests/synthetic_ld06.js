@@ -125,6 +125,15 @@ function toCsv(points, format = "ld06_mm") {
       const a = (p.angle * Math.PI) / 180;
       lines.push(`${p.angle.toFixed(2)},${p.distance.toFixed(4)},${(p.distance * Math.cos(a)).toFixed(4)},${(p.distance * Math.sin(a)).toFixed(4)}`);
     }
+  } else if (format === "printScanCSV") {
+    // sortie série du sketch LD06_capture (ld06.printScanCSV) : en-tête, une ligne par point, puis ligne vide ; fins de ligne CRLF
+    const rows = ["N,Angle,Distance,Intensity,x,y"];
+    points.forEach((p, i) => {
+      const a = (p.angle * Math.PI) / 180,
+        mm = Math.round(p.distance * 1000);
+      rows.push(`${i},${p.angle.toFixed(2)},${mm},${p.intensity},${Math.round(mm * Math.cos(a))},${Math.round(mm * Math.sin(a))}`);
+    });
+    return rows.join("\r\n") + "\r\n\r\n";
   } else throw new Error("format inconnu " + format);
   return lines.join("\n") + "\n";
 }

@@ -35,8 +35,9 @@ function makeCtx() {
 /**
  * Charge une version de l'application.
  * @param {string} htmlFile chemin relatif à la racine du projet (ex. "index.html")
+ * @param {object} [options] {serial} : faux navigator.serial (voir fakeSerial) ; la page est alors « sécurisée » (localhost)
  */
-function loadApp(htmlFile = "index.html") {
+function loadApp(htmlFile = "index.html", options = {}) {
   const html = fs.readFileSync(path.join(ROOT, htmlFile), "utf8");
   const defaults = parseDefaults(html);
   const elements = new Map();
@@ -112,8 +113,8 @@ function loadApp(htmlFile = "index.html") {
   };
   const context = vm.createContext({
     document,
-    window: { isSecureContext: false },
-    navigator: {},
+    window: { isSecureContext: !!options.serial },
+    navigator: options.serial ? { serial: options.serial } : {},
     devicePixelRatio: 1,
     Blob: FakeBlob,
     URL,
@@ -121,7 +122,8 @@ function loadApp(htmlFile = "index.html") {
     TextDecoder,
     performance,
     console,
-    setTimeout: (f) => setTimeout(f, 0),
+    // vraies minuteries, plafonnées à 1 s (le délai d'attente de 15 s de la capture dure donc 1 s en test)
+    setTimeout: (f, ms) => setTimeout(f, Math.min(Number(ms) || 0, 1000)),
     clearTimeout,
     Math, Number, Map, Set, Array, Object, JSON, Promise, Float32Array, String, Boolean, Error, Infinity, NaN, isFinite,
   });
@@ -176,4 +178,80 @@ globalThis.__app = {
   };
 }
 
-module.exports = { loadApp, ROOT };
+/**
+ * Faux port série Web Serial (SIMULATION) : imite la carte LD06_capture branchée en USB.
+ * send(text, taille) envoie des octets découpés en paquets arbitraires, comme le fait l'USB ;
+ * unplug() imite un câble débranché (read() lève une erreur).
+ */
+function fakeSerial() {
+  const queue = [],
+    log = [];
+  let waiting = null,
+    failure = null,
+    cancelled = false;
+  const wake = () => {
+    if (!waiting) return;
+    const w = waiting;
+    if (failure) {
+      waiting = null;
+      w.reject(failure);
+    } else if (cancelled) {
+      waiting = null;
+      w.resolve({ value: undefined, done: true });
+    } else if (queue.length) {
+      waiting = null;
+      w.resolve({ value: queue.shift(), done: false });
+    }
+  };
+  const reader = {
+    read() {
+      if (failure) return Promise.reject(failure);
+      if (queue.length) return Promise.resolve({ value: queue.shift(), done: false });
+      if (cancelled) return Promise.resolve({ value: undefined, done: true });
+      return new Promise((resolve, reject) => {
+        waiting = { resolve, reject };
+      });
+    },
+    releaseLock() {
+      log.push("releaseLock");
+    },
+    async cancel() {
+      log.push("cancel");
+      cancelled = true;
+      wake();
+    },
+  };
+  const port = {
+    openedWith: null,
+    closed: false,
+    async open(o) {
+      port.openedWith = o;
+      port.closed = false;
+      cancelled = false; // un port rouvert fournit un nouveau flux de lecture
+      failure = null;
+    },
+    readable: { getReader: () => reader },
+    async close() {
+      port.closed = true;
+    },
+  };
+  return {
+    port,
+    log,
+    serial: { requestPort: async () => port },
+    send(text, chunk = 61) {
+      const bytes = new TextEncoder().encode(text);
+      for (let i = 0; i < bytes.length; i += chunk) queue.push(bytes.slice(i, i + chunk));
+      wake();
+    },
+    unplug(message = "The device has been lost.") {
+      failure = new Error(message);
+      wake();
+    },
+  };
+}
+
+/** Laisse tourner la boucle de lecture série (promesses et minuteries en attente). */
+const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+
+module.exports = { loadApp, fakeSerial, settle, ROOT };

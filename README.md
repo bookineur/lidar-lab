@@ -51,7 +51,7 @@ node --test "tests/*.test.js"
 node tests/rapport_simulation.js
 ```
 
-Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e37950a.html`) et la version actuelle et écrit `tests/resultats_simulation.md`. Des scans simulés prêts à charger sont dans `tests/donnees_simulees/` (préfixe `SIM_`).
+Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e37950a.html`) et la version actuelle et écrit `tests/resultats_simulation.md`. Des scans simulés prêts à charger sont dans `tests/donnees_simulees/` (préfixe `SIM_`). `tests/v1_usb_capture.test.js` vérifie la capture USB avec un **faux port série** qui imite la sortie de `LD06_capture` (tours CSV découpés en paquets, connexion en milieu de tour, délai dépassé, câble débranché, déconnexion) : cela teste le logiciel, pas le câble, la carte ni le LD06 réels.
 
 ## Limites
 
