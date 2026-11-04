@@ -189,7 +189,7 @@
       for (;;) {
         if (q("rwLive").checked) {
           try {
-            const raw = await get("/api/robot/scan", 2500),
+            const raw = await get("/api/robot/scan", 7000),
               m = raw.match(/id=(\d+)/);
             robotOk = true;
             if (m && m[1] !== lastLiveId) {

@@ -98,7 +98,7 @@ let scanPending = null;
 async function robotScan(maxAge = 120) {
   if (Date.now() - lastScan.at < maxAge && lastScan.text) return lastScan;
   if (!scanPending)
-    scanPending = robotGet("/scan", 2500)
+    scanPending = robotGet("/scan", 6000) // un scan de ~6 ko peut mettre 1 à 3 s via un partage de connexion
       .then((text) => (lastScan = { text, id: scanId(text), moving: scanMoving(text), at: Date.now() }))
       .finally(() => (scanPending = null));
   return scanPending;

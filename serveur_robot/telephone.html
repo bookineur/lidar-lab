@@ -143,7 +143,7 @@ function drawLidar(){const[w,h,d]=sizeCanvas(lc),cx=w/2,cy=h/2,range=+$('zoom').
   lx.fillStyle=i<40?'#ff8b8b':i<120?'#ffde73':'#f4f7fb';lx.fillRect(cx-mir*y*s-1.5*d,cy-x*s-1.5*d,3*d,3*d)}}
 $('zoom').addEventListener('input',drawLidar);$('mirror').onchange=drawLidar;
 addEventListener('resize',()=>{drawJoy();drawLidar()});
-(async function poll(){for(;;){try{const s=parseScan(await get('/api/robot/scan',2500));if(s.pts.length){scan=s;drawLidar();
+(async function poll(){for(;;){try{const s=parseScan(await get('/api/robot/scan',7000));if(s.pts.length){scan=s;drawLidar();
   $('info').textContent=s.pts.length+' points · '+s.hz.toFixed(1)+' tours/s · tour n°'+s.id;
   if(document.activeElement!==$('lp')){$('lp').value=s.pwm;$('lpv').textContent=s.pwm+' %'}}
   status(true,'connecté')}catch(e){status(false,'robot injoignable')}await sleep(busy?80:250)}})();
