@@ -51,6 +51,7 @@
 <div class="actions"><button type="button" data-turn="45">⟲ 45°</button><button type="button" data-turn="15">⟲ 15°</button><button type="button" data-turn="-15">15° ⟳</button><button type="button" data-turn="-45">45° ⟳</button></div>
 <label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwLive" checked> Aperçu LiDAR en direct dans la vue</label>
 <label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwAuto"> Auto-SLAM : après chaque déplacement, prendre un scan et l’ajouter si le recalage est fiable</label>
+<label class="sub" style="display:block;margin-top:6px"><input type="checkbox" id="rwKeepRejected" checked> Garder les scans refusés en attente de recalage automatique</label>
 <div class="actions"><button type="button" class="primary" id="rwCapture">Capturer et ajouter à la carte</button><button type="button" id="rwUndo">Annuler le dernier scan</button><button type="button" id="rwRelocate">Recalculer les poses</button><button type="button" id="rwNew">Nouvelle séance</button></div>
 <div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus. En Auto-SLAM, chaque arrêt après déplacement lance une capture et un recalage; les poses incertaines restent hors de la carte.</div>
 <div class="sub" id="rwPhone" style="margin-top:6px"></div>`;
@@ -67,7 +68,6 @@
     let stops = 0,
       busyDrive = false,
       busy = false,
-      autoCaptureTimer = null,
       autoCaptureBusy = false;
     function speeds() {
       const v = +q("rwSpeed").value,
@@ -92,27 +92,24 @@
       } catch (e) {}
       busyDrive = false;
     }, 120);
-    // delay : attente avant la capture ; après une rotation chronométrée, il faut laisser la rotation finir,
-    // sinon le /stop envoyé par la capture la coupe en plein mouvement.
-    function scheduleAutoCapture(delay = 500) {
-      if (!q("rwAuto").checked) return;
-      if (autoCaptureTimer) clearTimeout(autoCaptureTimer);
-      autoCaptureTimer = setTimeout(async () => {
-        autoCaptureTimer = null;
-        if (!q("rwAuto").checked || held.size || autoCaptureBusy || busy) return;
+    const autoSlam = LidarAutoSlam.createAutoSlam({
+      enabled: () => q("rwAuto").checked,
+      blocked: () => held.size > 0 || autoCaptureBusy || busy,
+      capture: async () => {
         autoCaptureBusy = true;
         busy = true;
         q("rwCapture").disabled = true;
         card.querySelectorAll(".actions button").forEach((b) => (b.disabled = true));
         msg("Robot arrêté · attente du tour LiDAR complet, puis recalage sur la carte…");
         try {
-          const r = await post("/api/capture");
+          const r = await post("/api/capture", { auto: true, keepRejected: q("rwKeepRejected").checked });
           await sync(r.session);
-          const n = r.session.scans.length;
-          select(scans.findIndex((s) => s.serverName === r.scan.name));
+          if (!r.scan.discarded) select(scans.findIndex((s) => s.serverName === r.scan.name));
           msg(r.ok
-            ? "Auto-SLAM · scan " + n + " intégré : " + r.scan.note + ". Tu peux déplacer le robot."
-            : "Auto-SLAM · scan " + n + " conservé mais non intégré : " + r.scan.note + ". Reviens vers une zone déjà cartographiée puis déplace-toi à nouveau.");
+            ? "Auto-SLAM · scan intégré : " + r.scan.note + (r.retried ? " · " + r.retried + " ancien(s) scan(s) recalé(s) aussi." : "") + " Tu peux déplacer le robot."
+            : r.scan.discarded
+              ? "Auto-SLAM · pose refusée (" + r.scan.note + "); scan non conservé. Reste dans une zone qui recouvre la carte puis réessaie."
+              : "Auto-SLAM · scan conservé en attente : " + r.scan.note + ". Il sera recalé après un prochain scan accepté.");
         } catch (e) {
           msg("Auto-SLAM · capture impossible : " + e.message + ". Vérifie la connexion du robot puis réessaie.");
         } finally {
@@ -120,16 +117,16 @@
           busy = false;
           card.querySelectorAll(".actions button").forEach((b) => (b.disabled = false));
         }
-      }, delay);
-    }
+      },
+    });
+    function scheduleAutoCapture(delay = 500) { autoSlam.schedule(delay); }
     const press = (k) => {
       // pas de déplacement pendant une capture : le robot doit rester immobile pendant les tours du LiDAR
       if (busy || autoCaptureBusy) {
         msg("Capture en cours : attends la fin du recalage avant de déplacer le robot.");
         return;
       }
-      if (autoCaptureTimer) clearTimeout(autoCaptureTimer);
-      autoCaptureTimer = null;
+      autoSlam.cancel();
       held.add(k);
     },
       unpress = (k) => {
@@ -286,7 +283,7 @@
     }
     q("rwCapture").onclick = () =>
       act(async () => {
-        await stopNow(false);
+        await get("/api/robot/release", 800).catch(() => {});
         const r = await post("/api/capture");
         await sync(r.session);
         const n = r.session.scans.length;

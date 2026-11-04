@@ -252,7 +252,122 @@ function fakeSerial() {
   };
 }
 
+/** Faux DOM + ESP32 simulé pour tester le panneau Wi-Fi chargé comme script séparé. */
+function loadRobotPanel(options = {}) {
+  const elements = new Map(),
+    listeners = new Map(),
+    timers = new Set(),
+    intervals = new Set(),
+    calls = [],
+    session = { version: 0, name: "simu", dossier: "simu", robot: { url: "http://robot-lidar.local" }, scans: [] };
+  let scanId = 0,
+    closed = false,
+    renderCount = 0,
+    selected = -1;
+  function addElement(tag, attrs = {}) {
+    const e = {
+      tagName: tag.toUpperCase(), id: attrs.id || "", value: attrs.value || "", checked: /\bchecked\b/.test(attrs.raw || ""),
+      disabled: false, textContent: "", style: {}, dataset: {}, options: [], listeners: {}, parentNode: null,
+      addEventListener(name, fn) { (e.listeners[name] ||= []).push(fn); },
+      fire(name, event = {}) { for (const fn of e.listeners[name] || []) fn({ currentTarget: e, preventDefault() {}, pointerId: 1, ...event }); },
+      setPointerCapture() {}, append() {}, click() {},
+      querySelectorAll(selector) { return cardQuery(e, selector); },
+    };
+    for (const key of ["data-move", "data-turn"]) if (attrs[key]) e.dataset[key.slice(5)] = attrs[key];
+    if (e.id) elements.set(e.id, e);
+    return e;
+  }
+  let panelButtons = [];
+  function cardQuery(_root, selector) {
+    if (selector === "[data-move]") return panelButtons.filter((e) => e.dataset.move);
+    if (selector === "[data-turn]") return panelButtons.filter((e) => e.dataset.turn);
+    if (selector === ".actions button") return panelButtons.filter((e) => e.className === "action");
+    return [];
+  }
+  const card = addElement("section");
+  card.className = "card";
+  let html = "";
+  Object.defineProperty(card, "innerHTML", { get: () => html, set: (value) => {
+    html = value;
+    panelButtons = [];
+    elements.delete("robotWifiPc");
+    for (const m of value.matchAll(/<(button|input|span|div)\b([^>]*)>/g)) {
+      const attrs = m[2], id = (attrs.match(/\bid="([^"]+)"/) || [])[1], dataMove = (attrs.match(/\bdata-move="([^"]+)"/) || [])[1], dataTurn = (attrs.match(/\bdata-turn="([^"]+)"/) || [])[1];
+      const e = addElement(m[1], { id, value: (attrs.match(/\bvalue="([^"]*)"/) || [])[1], "data-move": dataMove, "data-turn": dataTurn, raw: attrs });
+      if (m[1] === "button") {
+        e.className = /class="[^"]*primary/.test(attrs) ? "action" : /data-turn=/.test(attrs) ? "action" : "button";
+        if (/class="[^"]*primary/.test(attrs)) e.className = "action";
+        if (dataTurn) e.className = "action";
+        panelButtons.push(e);
+      }
+    }
+  }});
+  const baseCard = { nextSibling: null, parentNode: { insertBefore() {} } };
+  const document = {
+    activeElement: { tagName: "BODY" },
+    body: { prepend() {} },
+    querySelector: (selector) => selector === "aside .card" ? baseCard : null,
+    querySelectorAll: () => [],
+    getElementById(id) { return elements.get(id) || null; },
+    createElement(tag) { return tag === "section" ? card : addElement(tag); },
+  };
+  const rawScan = (id) => `# robot_wifi id=${id} hz=10.0 pts=60 pwm=40 moving=0\nangle_deg,distance_mm,intensity\n` + Array.from({ length: 60 }, (_, i) => `${i * 6},1000,200`).join("\n") + "\n";
+  const jsonResponse = (body, ok = true) => ({ ok, json: async () => body, text: async () => JSON.stringify(body) });
+  async function fetch(url, request = {}) {
+    const parsed = new URL(url, "http://localhost"), route = parsed.pathname;
+    calls.push({ method: request.method || "GET", url: parsed.pathname + parsed.search, body: request.body, at: Date.now() });
+    if (route === "/api/status") return jsonResponse({ robot: "http://robot-lidar.local", online: true });
+    if (route === "/api/session") return jsonResponse(session);
+    if (route === "/api/robot/scan") return { ok: true, text: async () => rawScan(++scanId) };
+    if (route === "/api/scan/" + encodeURIComponent(options.scanName || "scan_01.csv")) return { ok: true, text: async () => rawScan(scanId || 1) };
+    if (route.startsWith("/api/robot/turn")) {
+      if (options.turn) await options.turn(parsed.searchParams.get("deg"), calls);
+      return { ok: true, text: async () => String(options.turnDuration || 300) };
+    }
+    if (route.startsWith("/api/robot/")) return { ok: true, text: async () => "ok" };
+    if (route === "/api/capture" && request.method === "POST") {
+      if (options.capture) await options.capture(request, calls);
+      const name = options.scanName || "scan_01.csv";
+      const scan = { name, pose: [1.25, -0.5, 17], reg: true, anchor: false, note: "recouvrement 80 %", points: 60 };
+      session.scans.push(scan);
+      session.version++;
+      return jsonResponse({ ok: true, scan, session: structuredClone(session) });
+    }
+    return { ok: false, status: 404, text: async () => "not found", json: async () => ({}) };
+  }
+  const timer = (fn, ms) => {
+    const id = setTimeout(() => { timers.delete(id); if (!closed) fn(); }, Math.min(Number(ms) || 0, 1200));
+    timers.add(id);
+    return id;
+  };
+  const clearTimer = (id) => { timers.delete(id); clearTimeout(id); };
+  const interval = (fn, ms) => { const id = setInterval(() => !closed && fn(), ms); intervals.add(id); return id; };
+  const clearIntervalFake = (id) => { intervals.delete(id); clearInterval(id); };
+  const scans = [],
+    context = vm.createContext({
+      document, fetch, console, URL, AbortController, setTimeout: timer, clearTimeout: clearTimer,
+      setInterval: interval, clearInterval: clearIntervalFake,
+      addEventListener(name, fn) { (listeners.get(name) || (listeners.set(name, []), listeners.get(name))).push(fn); },
+      scans, active: 0, MAX_SCANS: 50, serialFrameCounter: 0, livePreviewScan: null,
+      parseCsv(text, name) { return { name, pts: text.split("\n").filter((line) => /^\d/.test(line)).map((_, i) => ({ x: Math.cos(i), y: Math.sin(i), a: i * 6, r: 1, i: 200 })), pose: [0, 0, 0], visible: true, mapRegistered: false }; },
+      renderSelectors() { renderCount++; }, draw() {}, select(i) { selected = i; context.active = i; },
+      sleep: undefined,
+      Math, Number, String, Object, Array, Set, Map, Promise, Error, JSON, Infinity, NaN,
+    });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "serveur_robot", "auto_slam.js"), "utf8"), context, { filename: "auto_slam.js" });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "serveur_robot", "pilote_lidar_lab.js"), "utf8"), context, { filename: "pilote_lidar_lab.js" });
+  return {
+    calls, scans, session, panelButtons,
+    get renderCount() { return renderCount; }, get selected() { return selected; },
+    el: (id) => elements.get(id),
+    key(name, event = {}) { for (const fn of listeners.get(name) || []) fn({ key: event.key || "ArrowUp", preventDefault() {}, ...event }); },
+    turn(deg = 45) { const b = panelButtons.find((e) => e.dataset.turn === String(deg)); return b && b.onclick(); },
+    async wait(ms = 20) { await new Promise((resolve) => setTimeout(resolve, ms)); },
+    close() { closed = true; for (const id of intervals) clearInterval(id); for (const id of timers) clearTimeout(id); },
+  };
+}
+
 /** Laisse tourner la boucle de lecture série (promesses et minuteries en attente). */
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { loadApp, fakeSerial, settle, ROOT };
+module.exports = { loadApp, fakeSerial, loadRobotPanel, settle, ROOT };

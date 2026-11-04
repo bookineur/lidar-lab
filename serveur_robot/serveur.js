@@ -25,11 +25,32 @@ function option(name, def) {
   const i = process.argv.indexOf("--" + name);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : def;
 }
-const ROBOT_OPT = option("robot", "auto").replace(/\/+$/, "");
-let ROBOT = ROBOT_OPT === "auto" ? "" : ROBOT_OPT; // adresse du robot, trouvée automatiquement en mode auto
 const PORT = +option("port", 8000);
 const TP_DATA = path.join(os.homedir(), "TP-cartographie", "data");
 const DOSSIER = path.resolve(option("dossier", fs.existsSync(TP_DATA) ? path.join(TP_DATA, "robot_wifi") : path.join(ROOT, "seances_robot")));
+const ROBOT_ADDRESS_FILE = path.join(path.dirname(DOSSIER), "robot_address.json");
+function validRobotUrl(value) {
+  try {
+    const u = new URL(String(value));
+    const h = u.hostname.toLowerCase();
+    const privateHost = h === "localhost" || h.endsWith(".local") || /^10\./.test(h) || /^192\.168\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^127\./.test(h);
+    return (u.protocol === "http:" || u.protocol === "https:") && privateHost && !u.username && !u.password ? u.origin : "";
+  } catch { return ""; }
+}
+function readSavedRobotAddress() {
+  try { return validRobotUrl(JSON.parse(fs.readFileSync(ROBOT_ADDRESS_FILE, "utf8")).url); } catch { return ""; }
+}
+function saveRobotAddress(value) {
+  if (ROBOT_OPT !== "auto") return;
+  const url = validRobotUrl(value);
+  if (!url) return;
+  try {
+    fs.mkdirSync(path.dirname(ROBOT_ADDRESS_FILE), { recursive: true });
+    fs.writeFileSync(ROBOT_ADDRESS_FILE, JSON.stringify({ url, savedAt: new Date().toISOString() }, null, 2));
+  } catch {}
+}
+const ROBOT_OPT = option("robot", "auto").replace(/\/+$/, "");
+let ROBOT = ROBOT_OPT === "auto" ? readSavedRobotAddress() : ROBOT_OPT; // adresse connue ou découverte
 
 // ---------------- état ----------------
 let robotOnline = false,
@@ -52,6 +73,7 @@ function robotGet(p, timeout = 1500) {
       res.on("end", () => {
         robotOnline = true;
         robotLastSeen = Date.now();
+        saveRobotAddress(ROBOT);
         if (res.statusCode !== 200) reject(new Error("robot HTTP " + res.statusCode));
         else resolve(body);
       });
@@ -67,13 +89,17 @@ const scanId = (text) => {
   const m = /id=(\d+)/.exec(text.split("\n")[0] || "");
   return m ? +m[1] : -1;
 };
+const scanMoving = (text) => {
+  const m = /(?:^|\s)moving=([01])(?:\s|$)/.exec(text.split("\n")[0] || "");
+  return m ? m[1] === "1" : null;
+};
 // dernier scan du robot, partagé entre PC et téléphone (au plus un appel au robot toutes les 120 ms)
 let scanPending = null;
 async function robotScan(maxAge = 120) {
   if (Date.now() - lastScan.at < maxAge && lastScan.text) return lastScan;
   if (!scanPending)
     scanPending = robotGet("/scan", 2500)
-      .then((text) => (lastScan = { text, id: scanId(text), at: Date.now() }))
+      .then((text) => (lastScan = { text, id: scanId(text), moving: scanMoving(text), at: Date.now() }))
       .finally(() => (scanPending = null));
   return scanPending;
 }
@@ -99,8 +125,8 @@ function probe(url, timeout = 700) {
     });
   return ask("/info").then((j) => (j && j.name === "robot-lidar" ? url : ask("/pc").then((k) => (k && "url" in k ? url : null))));
 }
-async function discoverRobot(first = ["http://robot-lidar.local", "http://192.168.4.1"]) {
-  for (const u of first) if (await probe(u, 1500)) return u;
+async function discoverRobot(first = [ROBOT, "http://robot-lidar.local", "http://192.168.4.1"].filter(Boolean)) {
+  for (const u of [...new Set(first)]) if (await probe(u, 1500)) return u;
   // balayage des réseaux locaux du PC (x.y.z.1 à x.y.z.254), 64 adresses à la fois
   const bases = new Set(
     Object.values(os.networkInterfaces())
@@ -129,6 +155,7 @@ async function keepRobotFound() {
     if (found) {
       ROBOT = found;
       robotLastSeen = Date.now();
+      saveRobotAddress(found);
     } else if (!ROBOT) console.log("Robot introuvable pour l’instant (même réseau local que le PC ? robot allumé ? Wi-Fi invité/isolation client désactivée ?) — nouvel essai dans 5 s.");
   } finally {
     searching = false;
@@ -227,16 +254,9 @@ function locate(entry) {
 
 // ---------------- actions ----------------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function capture() {
-  await robotGet("/stop").catch(() => {});
-  const start = (await robotScan(0)).id;
-  const t0 = Date.now();
-  let s = lastScan;
-  while (s.id < start + 2) {
-    if (Date.now() - t0 > 6000) throw new Error("pas de nouveau tour du LiDAR");
-    await sleep(100);
-    s = await robotScan(0);
-  }
+async function capture(options = {}) {
+  const firstStill = await waitForStillScan(-1, 2);
+  const s = await waitForStillScan(firstStill.id, 2);
   const pts = LC.parseCsv(s.text, "x").pts.length;
   if (pts < 50) throw new Error("scan vide (" + pts + " points)");
   const n = seance.scans.length + 1,
@@ -245,12 +265,60 @@ async function capture() {
   const entry = { name, pose: [0, 0, 0], reg: false, anchor: false, note: "", points: pts, capturedAt: new Date().toISOString() };
   seance.scans.push(entry);
   const ok = locate(entry);
+  if (ok) entry.retryable = false;
+  else if (options.auto && options.keepRejected) entry.retryable = true;
+  if (!ok && options.auto && !options.keepRejected) {
+    const refused = { ...entry, discarded: true };
+    seance.scans.pop();
+    parsed.delete(entry.name);
+    fs.unlinkSync(path.join(seance.dir, entry.name));
+    saveSeance();
+    return { ok: false, scan: refused, retried: 0 };
+  }
+  const retried = ok ? retryPendingScans() : 0;
   saveSeance();
-  return { ok, scan: entry };
+  return { ok, scan: entry, retried };
+}
+function retryPendingScans() {
+  let total = 0, progress = true;
+  while (progress) {
+    progress = false;
+    for (const entry of seance.scans) {
+      if (!entry.retryable || entry.reg) continue;
+      if (locate(entry)) {
+        entry.retryable = false;
+        total++;
+        progress = true;
+      }
+    }
+  }
+  return total;
+}
+async function waitForStillScan(afterId, count, timeoutMs = 15000) {
+  const t0 = Date.now();
+  let lastId = -1, still = 0, s;
+  while (Date.now() - t0 <= timeoutMs) {
+    s = await robotScan(0);
+    if (s.moving === null) {
+      const e = new Error("le robot ne signale pas moving=0/1; téléverse le sketch Wi-Fi mis à jour avant de capturer");
+      e.statusCode = 409;
+      throw e;
+    }
+    if (s.id !== lastId) {
+      lastId = s.id;
+      if (s.id > afterId && !s.moving) still++;
+      else still = 0;
+      if (still >= count) return s;
+    }
+    await sleep(80);
+  }
+  const e = new Error(s && s.moving ? "robot encore en mouvement; capture annulée sans arrêter les moteurs" : "pas assez de tours LiDAR stables pour capturer");
+  e.statusCode = 409;
+  throw e;
 }
 function relocateAll() {
   seance.scans.forEach((e) => Object.assign(e, { reg: false, anchor: false }));
-  for (const e of seance.scans) locate(e);
+  for (const e of seance.scans) if (locate(e)) e.retryable = false;
   saveSeance();
 }
 
@@ -287,6 +355,7 @@ async function handle(req, res) {
     if (p.startsWith("/api/robot/")) {
       const cmd = p.slice(11);
       if (!ROBOT_CMDS.has(cmd)) return send(res, 404, { erreur: "commande inconnue" });
+      if (busy && (cmd === "drive" || cmd === "turn")) return send(res, 409, { erreur: "capture ou recalage en cours; commande de mouvement refusée" });
       return send(res, 200, await robotGet("/" + cmd + u.search, 1200), "text/plain; charset=utf-8");
     }
     // --- séance ---
@@ -308,7 +377,7 @@ async function handle(req, res) {
       busy = true;
       try {
         const body = await readBody(req);
-        if (p === "/api/capture") return send(res, 200, { ...(await capture()), session: sessionJson() });
+        if (p === "/api/capture") return send(res, 200, { ...(await capture(body)), session: sessionJson() });
         if (p === "/api/undo") {
           const e = seance.scans.pop();
           if (e) parsed.delete(e.name); // le fichier CSV reste sur le disque
@@ -317,9 +386,13 @@ async function handle(req, res) {
         }
         if (p === "/api/retry") {
           const e = seance.scans.find((s) => s.name === body.name);
-          if (e) locate(e);
+          let retried = 0;
+          if (e && locate(e)) {
+            e.retryable = false;
+            retried = retryPendingScans();
+          }
           saveSeance();
-          return send(res, 200, sessionJson());
+          return send(res, 200, { ...sessionJson(), retried });
         }
         if (p === "/api/relocate") return relocateAll(), send(res, 200, sessionJson());
         if (p === "/api/settings") {
@@ -340,7 +413,7 @@ async function handle(req, res) {
     if (/(^|[\\/])\.|node_modules|seances_robot/.test(path.relative(ROOT, file)) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return send(res, 404, "introuvable", "text/plain");
     return send(res, 200, fs.readFileSync(file), TYPES[path.extname(file)] || "application/octet-stream");
   } catch (e) {
-    return send(res, 502, { erreur: e.message || String(e) });
+    return send(res, e.statusCode || 502, { erreur: e.message || String(e) });
   }
 }
 

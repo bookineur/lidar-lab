@@ -1,4 +1,4 @@
-<!-- Version téléphone reliée au PC (servie par serveur_robot/serveur.js). Fabriquée à partir de la page de ESP32_robot_wifi_v4. -->
+<!-- Version téléphone reliée au PC, maintenue dans ce dépôt; Auto-SLAM partagé via auto_slam.js. La page autonome du firmware reste distincte. -->
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -55,6 +55,8 @@ label,.sub{font-size:13px;color:#9aabc0}input[type=range]{flex:1;min-width:110px
 <canvas id="map"></canvas>
 <div class="sub" id="mapinfo">Capture un premier scan : il devient l’origine (0, 0, 0°) de la carte.</div>
 <div class="row"><button class="cap" id="cap">Capturer et ajouter à la carte</button></div>
+<div class="row"><label><input type="checkbox" id="phoneAuto"> Auto-SLAM : capturer après chaque arrêt</label></div>
+<div class="row"><label><input type="checkbox" id="phoneKeepRejected" checked> Garder les poses refusées pour les réessayer</label></div>
 <div class="sub" id="capst" style="margin-top:8px">Arrête-toi, capture, avance d’un petit pas (30–50 cm) ou tourne de 15–45°, recommence. Chaque scan doit revoir des murs déjà cartographiés.</div>
 <div class="row"><button id="undo">Annuler le dernier scan</button><button id="relocate">Recalculer les poses</button></div>
 <div id="list"></div>
@@ -81,10 +83,10 @@ label,.sub{font-size:13px;color:#9aabc0}input[type=range]{flex:1;min-width:110px
 <div class="sub">Puissance de démarrage : monte-la si une roue ne bouge pas au début du joystick, baisse-la si le robot démarre d’un coup.</div>
 </section>
 </main>
-<script src="/lidar_core.js"></script>
+<script src="/lidar_core.js"></script><script src="/serveur_robot/auto_slam.js"></script>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let joy={x:0,y:0,active:false},scan=null,stopsToSend=3,busyDrive=false,busy=false,pendingFix=null;
+let joy={x:0,y:0,active:false},scan=null,stopsToSend=3,busyDrive=false,busy=false,pendingFix=null,autoCaptureBusy=false;
 let pcOk=false,robotOk=false;function status(ok){robotOk=ok;showStatus()}function showStatus(){$('st').textContent=(pcOk?'PC ✓':'PC ✗')+' · '+(robotOk?'robot ✓':'robot ✗');$('st').className=pcOk&&robotOk?'ok':'ko'}
 async function get(url,ms=1500){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});if(!r.ok)throw new Error('erreur '+r.status);return await r.text()}finally{clearTimeout(t)}}
 var setBusy=function(b){busy=b;document.querySelectorAll('[data-deg],#cap').forEach(x=>x.disabled=b)};
@@ -96,11 +98,18 @@ function wheelSpeeds(){if(Math.hypot(joy.x,joy.y)<0.1)return[0,0];
  const y=expo(joy.y),x=expo(joy.x)*$('vturn').value/100;let l=y+x,r=y-x;
  const s=Math.max(1,Math.abs(l),Math.abs(r)),v=+$('vmax').value;return[Math.round(l/s*v),Math.round(r/s*v)]}
 setInterval(async()=>{if(busyDrive)return;busyDrive=true;try{
- if(joy.active){const[l,r]=wheelSpeeds();await get('/api/robot/drive?l='+l+'&r='+r,800)}
+ if(joy.active&&!busy){const[l,r]=wheelSpeeds();await get('/api/robot/drive?l='+l+'&r='+r,800)}
  else if(stopsToSend>0){stopsToSend--;await get('/api/robot/release',800)}}catch(e){}busyDrive=false},120);
-function release(){joy={x:0,y:0,active:false};stopsToSend=3;drawJoy()}      // lâcher : arrêt progressif
-function stopNow(){joy={x:0,y:0,active:false};stopsToSend=0;drawJoy();return get('/api/robot/stop',800).catch(()=>{})} // STOP : immédiat
-$('stop').onclick=stopNow;
+const autoSlam=LidarAutoSlam.createAutoSlam({enabled:()=>$('phoneAuto').checked,blocked:()=>busy||joy.active||autoCaptureBusy,capture:async()=>{
+ autoCaptureBusy=true;setBusy(true);$('capst').textContent='Auto-SLAM : robot immobile, attente des tours stables puis recalage…';
+ try{const r=await post('/api/capture',{auto:true,keepRejected:$('phoneKeepRejected').checked});await applySession(r.session);
+  $('capst').textContent=r.ok?'Auto-SLAM : scan intégré ('+r.scan.note+')'+(r.retried?' · '+r.retried+' ancien(s) scan(s) recalé(s).':''):'Auto-SLAM : '+(r.scan.discarded?'pose refusée, scan supprimé.':'scan conservé en attente de recalage.')}
+ catch(e){$('capst').textContent='Auto-SLAM : capture impossible — '+e.message}
+ finally{autoCaptureBusy=false;setBusy(false)}}});
+function scheduleAutoCapture(delay=500){autoSlam.schedule(delay)}
+function release(schedule=true){const moved=joy.active;joy={x:0,y:0,active:false};stopsToSend=3;drawJoy();if(moved&&schedule)scheduleAutoCapture()}      // lâcher : arrêt progressif
+function stopNow(capture=true){const moved=joy.active;joy={x:0,y:0,active:false};stopsToSend=0;drawJoy();const p=get('/api/robot/stop',800).catch(()=>{});if(moved&&capture)scheduleAutoCapture();return p} // STOP : immédiat
+$('stop').onclick=()=>stopNow(true);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopNow()});
 addEventListener('pagehide',stopNow);
 
@@ -114,7 +123,7 @@ function drawJoy(){const[w,h,d]=sizeCanvas(jc),R=w/2-14*d;jx.clearRect(0,0,w,h);
  jx.fillStyle=joy.active?'#69d4c5':'#233446';jx.beginPath();jx.arc(w/2+joy.x*R,h/2-joy.y*R,24*d,0,7);jx.fill()}
 function joyAt(e){const r=jc.getBoundingClientRect(),R=r.width/2-14;let x=(e.clientX-r.left-r.width/2)/R,y=-(e.clientY-r.top-r.height/2)/R;
  const m=Math.hypot(x,y);if(m>1){x/=m;y/=m}joy.x=x;joy.y=y;drawJoy()}
-jc.addEventListener('pointerdown',e=>{if(busy)return;jc.setPointerCapture(e.pointerId);joy.active=true;joyAt(e)});
+jc.addEventListener('pointerdown',e=>{if(busy)return;autoSlam.cancel();jc.setPointerCapture(e.pointerId);joy.active=true;joyAt(e)});
 jc.addEventListener('pointermove',e=>{if(joy.active)joyAt(e)});
 for(const ev of['pointerup','pointercancel','lostpointercapture'])jc.addEventListener(ev,()=>{if(joy.active)release()});
 for(const[id,out,suf]of[['vmax','vv',' %'],['vturn','vt',' %'],['minpwm','mpv',''],['lp','lpv',' %'],['zoom','zv',' m']])
@@ -152,9 +161,10 @@ function measureRotation(A,B){const pa=profile(A),pb=profile(B);let best=null,co
  if(!best)return null;const l=costs[best.s-1],r=costs[best.s+1];let off=0;
  if(l!==undefined&&r!==undefined&&l+r-2*best.c>1e-9)off=0.5*(l-r)/(l+r-2*best.c);
  return{deg:best.s+off,err:best.c}}
-document.querySelectorAll('[data-deg]').forEach(b=>b.onclick=async()=>{if(busy)return;setBusy(true);const deg=+b.dataset.deg;$('fixrow').hidden=true;
+document.querySelectorAll('[data-deg]').forEach(b=>b.onclick=async()=>{if(busy)return;setBusy(true);const deg=+b.dataset.deg;let autoAfterTurn=false;$('fixrow').hidden=true;
  try{await stopNow();$('turnres').textContent='Arrêt, scan de départ…';const A=await freshScan(2);
   const ms=+(await get('/api/robot/turn?deg='+deg,1500));$('turnres').textContent='Rotation de '+Math.abs(deg)+'° en cours…';
+  autoAfterTurn=true;
   await sleep(ms+RAMP_WAIT);const B=await freshScan(2);const m=measureRotation(A,B);
   if(!m||m.err>0.15){$('turnres').textContent='Rotation faite ('+ms+' ms). Mesure LiDAR impossible (pas assez de murs, ou robot déplacé).';return}
   const same=Math.sign(m.deg)===Math.sign(deg),abs=Math.abs(m.deg);
@@ -162,7 +172,7 @@ document.querySelectorAll('[data-deg]').forEach(b=>b.onclick=async()=>{if(busy)r
   if(!same&&abs>3)t+=' (le LiDAR voit le sens opposé : soit le robot a tourné à l’envers, soit les angles du LiDAR sont en sens horaire)';
   $('turnres').textContent=t;
   if(abs>3&&Math.abs(abs-Math.abs(deg))>1){pendingFix=+$('mspd').value*Math.abs(deg)/abs;$('fix').textContent='Corriger le réglage : '+$('mspd').value+' → '+pendingFix.toFixed(1)+' ms/°';$('fixrow').hidden=false}}
- catch(e){$('turnres').textContent='Rotation impossible : '+e.message}finally{setBusy(false)}});
+ catch(e){$('turnres').textContent='Rotation impossible : '+e.message}finally{setBusy(false);if(autoAfterTurn)scheduleAutoCapture(500)}});
 const RAMP_WAIT=600;
 $('fix').onclick=async()=>{if(pendingFix===null)return;$('mspd').value=pendingFix.toFixed(1);await saveCfg();$('fixrow').hidden=true;pendingFix=null};
 
@@ -204,8 +214,8 @@ function renderList(all){const l=$('list');l.innerHTML='';all.forEach((s,i)=>{co
  const a=document.createElement('a');a.href='/api/scan/'+encodeURIComponent(s.name);a.download=s.name;a.innerHTML='<button type="button">CSV</button>';row.append(a);l.append(row)})}
 async function act(fn,msg){if(busy)return;setBusy(true);try{if(msg)$('capst').textContent=msg;await applySession(await fn())}catch(e){$('capst').textContent='Impossible : '+e.message}finally{setBusy(false)}}
 $('cap').onclick=async()=>{if(busy)return;setBusy(true);
- try{await stopNow();$('capst').textContent='Capture et recalage sur le PC…';const r=await post('/api/capture');await applySession(r.session);const n=r.session.scans.length;
-  $('capst').textContent=r.ok?'Scan '+n+' intégré ('+r.scan.note+') et enregistré sur le PC. Déplace-toi d’un petit pas puis capture le suivant.':'Scan '+n+' enregistré mais '+r.scan.note+'. Reviens vers une zone déjà cartographiée, puis recapture.'}
+ try{release(false);await get('/api/robot/release',800).catch(()=>{});$('capst').textContent='Capture et recalage sur le PC…';const r=await post('/api/capture');await applySession(r.session);const n=r.session.scans.length;
+  $('capst').textContent=r.ok?'Scan '+n+' intégré ('+r.scan.note+')'+(r.retried?' · '+r.retried+' ancien(s) scan(s) recalé(s).':''):'Scan refusé'+(r.scan.discarded?' et supprimé.':', conservé en attente.')}
  catch(e){$('capst').textContent='Capture impossible : '+e.message}finally{setBusy(false)}};
 $('undo').onclick=()=>act(()=>post('/api/undo'),'Retrait du dernier scan…');
 $('relocate').onclick=()=>act(()=>post('/api/relocate'),'Recalcul de toutes les poses sur le PC…');
