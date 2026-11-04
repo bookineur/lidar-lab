@@ -35,7 +35,9 @@ Avec le sketch `ESP32_robot_wifi_v4` (dépôt TP-cartographie, dossier `arduino`
 4. Sur le téléphone, se connecter au Wi-Fi Robot-LiDAR et ouvrir http://192.168.4.1. Le robot renvoie automatiquement vers la version reliée au PC (`/telephone`).
 5. Chaque scan, pris depuis le PC ou depuis le téléphone, est enregistré dans `TP-cartographie/data/robot_wifi/seance_<date>/` (ou le dossier donné par `--dossier`). Il est recalé avec `lidar_core.js` et apparaît avec sa pose dans la liste de Lidar Lab. `poses.json`, `grid_map.csv` et `grid_map_map_tool.csv` y sont mis à jour à chaque scan, et `seance.json` permet de reprendre la séance au redémarrage du serveur.
 
-Options du serveur : `--robot http://192.168.4.1`, `--port 8000`, `--dossier C:\chemin`. Sans le serveur, Lidar Lab fonctionne comme avant, et la page du robot (http://192.168.4.1) reste utilisable seule.
+**Avec ton propre Wi-Fi (sketch `ESP32_robot_wifi_v5`).** Mets le nom et le mot de passe de ton Wi-Fi dans `wifi_secrets.h`, à côté du sketch (modèle : `wifi_secrets_exemple.h` ; ce fichier est ignoré par git) : uniquement un réseau 2,4 GHz avec un simple mot de passe (box, ou partage de connexion du téléphone ; pas eduroam). Le robot rejoint ce réseau, et le PC garde internet. S'il n'arrive pas à s'y connecter en 15 s, il recrée Robot-LiDAR comme avant. Son adresse s'affiche dans le moniteur série (115200 bauds), et il répond aussi à http://robot-lidar.local. Le serveur le trouve tout seul : il essaie robot-lidar.local, puis 192.168.4.1, puis balaie le réseau local du PC. Sur le téléphone, ouvre l'adresse du robot pour être renvoyé vers le PC, ou directement l'adresse « Téléphone » affichée par le serveur. Les réseaux d'école isolent souvent les appareils entre eux : dans ce cas, passe par le partage de connexion du téléphone.
+
+Options du serveur : `--robot auto` (par défaut) ou `--robot http://192.168.1.37`, `--port 8000`, `--dossier C:\chemin`. Sans le serveur, Lidar Lab fonctionne comme avant, et la page du robot (http://192.168.4.1) reste utilisable seule.
 
 ## Relevé incrémental et méthode SLAM
 

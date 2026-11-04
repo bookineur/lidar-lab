@@ -3,14 +3,15 @@
 //  Serveur Lidar Lab ⇄ robot Wi-Fi (PC)
 //
 //  - sert Lidar Lab (http://localhost:8000) et la version téléphone (/telephone)
-//  - relaie le pilotage et le LiDAR vers le robot (ESP32_robot_wifi_v4, http://192.168.4.1)
+//  - relaie le pilotage et le LiDAR vers le robot (ESP32_robot_wifi_v4 ou v5)
+//  - trouve le robot tout seul : robot-lidar.local, 192.168.4.1, puis balayage du réseau local
 //  - à chaque capture : enregistre le scan CSV sur le disque, le recale avec les calculs
 //    de Lidar Lab (lidar_core.js) et met à jour poses.json et grid_map.csv
 //  - Lidar Lab et le téléphone voient la même séance en direct
 //
-//  Lancer (le PC doit être connecté au Wi-Fi « Robot-LiDAR ») :
+//  Lancer (PC sur le même Wi-Fi que le robot : ton Wi-Fi, ou « Robot-LiDAR ») :
 //      node serveur_robot/serveur.js
-//  Options : --robot http://192.168.4.1   --port 8000   --dossier C:\chemin\des\seances
+//  Options : --robot auto (défaut) ou http://192.168.1.37   --port 8000   --dossier C:\chemin\des\seances
 //  Aucune dépendance à installer. Aucune donnée n'est envoyée sur internet.
 // ============================================================================
 const http = require("http");
@@ -24,7 +25,8 @@ function option(name, def) {
   const i = process.argv.indexOf("--" + name);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : def;
 }
-const ROBOT = option("robot", "http://192.168.4.1").replace(/\/+$/, "");
+const ROBOT_OPT = option("robot", "auto").replace(/\/+$/, "");
+let ROBOT = ROBOT_OPT === "auto" ? "" : ROBOT_OPT; // adresse du robot, trouvée automatiquement en mode auto
 const PORT = +option("port", 8000);
 const TP_DATA = path.join(os.homedir(), "TP-cartographie", "data");
 const DOSSIER = path.resolve(option("dossier", fs.existsSync(TP_DATA) ? path.join(TP_DATA, "robot_wifi") : path.join(ROOT, "seances_robot")));
@@ -42,6 +44,7 @@ let version = 0,
 // ---------------- robot ----------------
 function robotGet(p, timeout = 1500) {
   return new Promise((resolve, reject) => {
+    if (!ROBOT) return reject(new Error("robot pas encore trouvé sur le réseau"));
     const req = http.get(ROBOT + p, { timeout }, (res) => {
       let body = "";
       res.setEncoding("utf8");
@@ -74,9 +77,72 @@ async function robotScan(maxAge = 120) {
       .finally(() => (scanPending = null));
   return scanPending;
 }
+// ---------------- recherche du robot sur le réseau ----------------
+// reconnaît le robot : /info (v5) ou /pc (v4)
+function probe(url, timeout = 700) {
+  const ask = (p) =>
+    new Promise((res) => {
+      const r = http.get(url + p, { timeout }, (x) => {
+        let b = "";
+        x.setEncoding("utf8");
+        x.on("data", (c) => (b += c));
+        x.on("end", () => {
+          try {
+            res(JSON.parse(b));
+          } catch {
+            res(null);
+          }
+        });
+      });
+      r.on("timeout", () => r.destroy());
+      r.on("error", () => res(null));
+    });
+  return ask("/info").then((j) => (j && j.name === "robot-lidar" ? url : ask("/pc").then((k) => (k && "url" in k ? url : null))));
+}
+async function discoverRobot(first = ["http://robot-lidar.local", "http://192.168.4.1"]) {
+  for (const u of first) if (await probe(u, 1500)) return u;
+  // balayage des réseaux locaux du PC (x.y.z.1 à x.y.z.254), 64 adresses à la fois
+  const bases = new Set(
+    Object.values(os.networkInterfaces())
+      .flat()
+      .filter((i) => i && i.family === "IPv4" && !i.internal && !i.address.startsWith("169.254."))
+      .map((i) => i.address.split(".").slice(0, 3).join("."))
+  );
+  for (const b of bases) {
+    const urls = [];
+    for (let k = 1; k < 255; k++) urls.push("http://" + b + "." + k);
+    for (let i = 0; i < urls.length; i += 64) {
+      const hit = (await Promise.all(urls.slice(i, i + 64).map((u) => probe(u)))).find(Boolean);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+let searching = false;
+async function keepRobotFound() {
+  if (ROBOT_OPT !== "auto" || searching) return;
+  if (ROBOT && Date.now() - robotLastSeen < 15000) return;
+  searching = true;
+  try {
+    const found = await discoverRobot();
+    if (found && found !== ROBOT) console.log("Robot trouvé : " + found);
+    if (found) {
+      ROBOT = found;
+      robotLastSeen = Date.now();
+    } else if (!ROBOT) console.log("Robot introuvable pour l’instant (même Wi-Fi que le PC ? robot allumé ?) — nouvel essai dans 5 s.");
+  } finally {
+    searching = false;
+  }
+}
 // le robot apprend l'adresse du PC pour rediriger le téléphone
-setInterval(() => robotGet("/register?port=" + PORT, 1200).catch(() => {}), 3000);
-robotGet("/register?port=" + PORT, 1200).catch(() => {});
+function register() {
+  robotGet("/register?port=" + PORT, 1200).catch(() => {});
+}
+if (require.main === module) {
+  setInterval(() => keepRobotFound().then(register), 5000);
+  setInterval(register, 3000);
+  keepRobotFound().then(register);
+}
 
 // ---------------- séance (fichiers) ----------------
 const stamp = () => {
@@ -208,7 +274,7 @@ function readBody(req) {
   });
 }
 function sessionJson() {
-  return { version, name: seance.name, dossier: seance.dir, settings: seance.settings, scans: seance.scans, robot: { url: ROBOT, online: robotOnline } };
+  return { version, name: seance.name, dossier: seance.dir, settings: seance.settings, scans: seance.scans, robot: { url: ROBOT || "recherche…", online: robotOnline } };
 }
 const ROBOT_CMDS = new Set(["drive", "release", "stop", "turn", "config", "lidar"]);
 
@@ -224,7 +290,7 @@ async function handle(req, res) {
       return send(res, 200, await robotGet("/" + cmd + u.search, 1200), "text/plain; charset=utf-8");
     }
     // --- séance ---
-    if (p === "/api/status") return send(res, 200, { robot: ROBOT, online: robotOnline, seance: seance.name, dossier: seance.dir, version });
+    if (p === "/api/status") return send(res, 200, { robot: ROBOT || "recherche…", online: robotOnline, seance: seance.name, dossier: seance.dir, version });
     if (p === "/api/session") return send(res, 200, sessionJson());
     if (p.startsWith("/api/scan/")) {
       const name = path.basename(p.slice(10));
@@ -278,18 +344,20 @@ async function handle(req, res) {
   }
 }
 
+if (require.main === module) {
 loadLatestSeance();
 http.createServer(handle).listen(PORT, "0.0.0.0", () => {
   const ips = Object.values(os.networkInterfaces())
     .flat()
-    .filter((i) => i && i.family === "IPv4" && !i.internal)
+    .filter((i) => i && i.family === "IPv4" && !i.internal && !i.address.startsWith("169.254."))
     .map((i) => i.address);
   console.log("Lidar Lab + robot Wi-Fi");
   console.log("  Lidar Lab sur ce PC   : http://localhost:" + PORT);
   for (const ip of ips) console.log("  Téléphone             : http://" + ip + ":" + PORT + "/telephone");
-  console.log("  Robot                 : " + ROBOT + " (le téléphone qui ouvre cette adresse est renvoyé vers le PC)");
+  console.log("  Robot                 : " + (ROBOT || "recherche automatique (robot-lidar.local, 192.168.4.1, réseau local)…") + " — le téléphone qui ouvre l’adresse du robot est renvoyé vers le PC");
   console.log("  Séance                : " + seance.dir);
   console.log("Ctrl+C pour arrêter.");
 });
+}
 
-module.exports = { handle }; // pour les tests
+module.exports = { handle, probe, discoverRobot }; // pour les tests

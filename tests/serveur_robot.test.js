@@ -22,6 +22,8 @@ function fakeRobot() {
       return s.end(`# robot_wifi id=${st.id} hz=10.0 pts=${pts.length} pwm=40\nangle_deg,distance_mm,intensity\n` + pts.map((p) => `${p.angle.toFixed(2)},${Math.round(p.distance * 1000)},${p.intensity}`).join("\n") + "\n");
     }
     if (u.pathname === "/register") st.registered = u.searchParams.get("port");
+    if (u.pathname === "/info") return s.end(st.v4 ? "introuvable" : JSON.stringify({ name: "robot-lidar", version: 5, mode: "wifi", ip: "127.0.0.1" }));
+    if (u.pathname === "/pc") return s.end(JSON.stringify({ url: "" }));
     s.end(u.pathname === "/turn" ? "495" : "ok");
   });
   return new Promise((r) => srv.listen(0, "127.0.0.1", () => r({ st, port: srv.address().port, close: () => (clearInterval(timer), srv.close()) })));
@@ -79,4 +81,17 @@ test("serveur robot : relais, capture enregistrée sur le disque, recalage, séa
   const u = JSON.parse((await req(port, "/api/undo", "POST")).body);
   assert.equal(u.scans.length, 1);
   assert.ok(fs.existsSync(path.join(seance, c2.scan.name)));
+});
+
+test("serveur robot : recherche automatique du robot sur le réseau (v5 par /info, v4 par /pc)", async (t) => {
+  const { probe, discoverRobot } = require("../serveur_robot/serveur.js");
+  const robot = await fakeRobot();
+  t.after(() => robot.close());
+  const url = "http://127.0.0.1:" + robot.port;
+  assert.equal(await probe(url), url, "robot v5 reconnu");
+  robot.st.v4 = true;
+  assert.equal(await probe(url), url, "robot v4 reconnu par /pc");
+  assert.equal(await probe("http://127.0.0.1:1", 300), null, "adresse sans robot ignorée");
+  robot.st.v4 = false;
+  assert.equal(await discoverRobot(["http://127.0.0.1:1", url]), url, "premier candidat qui répond");
 });
