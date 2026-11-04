@@ -25,6 +25,18 @@ Le sketch ESP32_robot_wifi_v2.ino crée le point d’accès Robot-LiDAR (mot de 
 3. Dans « Connexion Wi-Fi au robot ESP32 », garder http://192.168.4.1 ou saisir l’adresse du robot si le sketch utilise une autre adresse; cliquer « Connecter en Wi-Fi » et autoriser le réseau local si le navigateur le demande.
 4. L’aperçu se rafraîchit par lecture HTTP des nouveaux tours. Capturer le tour affiché pour estimer la pose et l’ajouter à la carte cumulée, comme en USB. La liaison Wi-Fi de Lidar Lab reçoit les mesures; elle ne pilote pas les moteurs depuis cette page.
 
+## Pilotage du robot et téléphone reliés au PC
+
+Avec le sketch `ESP32_robot_wifi_v4` (dépôt TP-cartographie, dossier `arduino`) et le serveur `serveur_robot/serveur.js`, Lidar Lab pilote le robot, et le téléphone partage la même séance que le PC. Les scans sont enregistrés sur le disque.
+
+1. Téléverser `ESP32_robot_wifi_v4.ino` sur l’ESP32, puis connecter le PC au Wi-Fi Robot-LiDAR (mot de passe lidar2026).
+2. Dans ce dossier, lancer `node serveur_robot/serveur.js`. La première fois, Windows demande l’accès réseau pour Node.js : cocher aussi « réseaux publics », car le Wi-Fi du robot est classé public. Sinon, le téléphone ne pourra pas joindre le PC.
+3. Sur le PC, ouvrir http://localhost:8000. Le panneau « Robot Wi-Fi · relié au PC » apparaît : pilotage avec les boutons ou les flèches / ZQSD (Espace = STOP), rotations 15° / 45°, aperçu en direct, « Capturer et ajouter à la carte ».
+4. Sur le téléphone, se connecter au Wi-Fi Robot-LiDAR et ouvrir http://192.168.4.1. Le robot renvoie automatiquement vers la version reliée au PC (`/telephone`).
+5. Chaque scan, pris depuis le PC ou depuis le téléphone, est enregistré dans `TP-cartographie/data/robot_wifi/seance_<date>/` (ou le dossier donné par `--dossier`). Il est recalé avec `lidar_core.js` et apparaît avec sa pose dans la liste de Lidar Lab. `poses.json`, `grid_map.csv` et `grid_map_map_tool.csv` y sont mis à jour à chaque scan, et `seance.json` permet de reprendre la séance au redémarrage du serveur.
+
+Options du serveur : `--robot http://192.168.4.1`, `--port 8000`, `--dossier C:\chemin`. Sans le serveur, Lidar Lab fonctionne comme avant, et la page du robot (http://192.168.4.1) reste utilisable seule.
+
 ## Relevé incrémental et méthode SLAM
 
 Le flux d’utilisation est « observer → capturer → recaler → intégrer → déplacer un peu → recommencer ». L’aperçu USB est actualisé à chaque tour CSV complet du LiDAR; le blanc identifie le tour affiché, qui n’est pas encore ajouté à la carte. Le bouton capture ce tour sans attendre le suivant. Si la forme n’est pas stable ou lisible, attendre le prochain tour avant de cliquer.
