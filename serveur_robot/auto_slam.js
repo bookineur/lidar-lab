@@ -2,8 +2,20 @@
 (function (root) {
   "use strict";
   function createAutoSlam({ enabled, blocked, capture, setTimer = setTimeout, clearTimer = clearTimeout }) {
-    let timer = null, running = false;
+    let timer = null, running = false, wasMoving = false;
     function cancel() { if (timer !== null) clearTimer(timer); timer = null; }
+    function observeMotion(moving) {
+      if (typeof moving !== "boolean") return;
+      if (moving) {
+        wasMoving = true;
+        if (enabled()) cancel();
+        return;
+      }
+      if (wasMoving) {
+        wasMoving = false;
+        if (enabled()) schedule();
+      }
+    }
     function schedule(delay = 500) {
       cancel();
       if (!enabled()) return;
@@ -15,7 +27,7 @@
         try { await capture(); } finally { running = false; }
       }, Math.max(0, Number(delay) || 0));
     }
-    return { schedule, cancel, get running() { return running; }, get pending() { return timer !== null; } };
+    return { schedule, cancel, observeMotion, get running() { return running; }, get pending() { return timer !== null; } };
   }
   root.LidarAutoSlam = { createAutoSlam };
 })(typeof window !== "undefined" ? window : globalThis);

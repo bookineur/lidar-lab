@@ -55,7 +55,7 @@ label,.sub{font-size:13px;color:#9aabc0}input[type=range]{flex:1;min-width:110px
 <canvas id="map"></canvas>
 <div class="sub" id="mapinfo">Capture un premier scan : il devient l’origine (0, 0, 0°) de la carte.</div>
 <div class="row"><button class="cap" id="cap">Capturer et ajouter à la carte</button></div>
-<div class="row"><label><input type="checkbox" id="phoneAuto"> Auto-SLAM : capturer après chaque arrêt</label></div>
+<div class="row"><label><input type="checkbox" id="phoneAuto" checked> Auto-SLAM : capturer après chaque arrêt</label></div>
 <div class="row"><label><input type="checkbox" id="phoneKeepRejected" checked> Garder les poses refusées pour les réessayer</label></div>
 <div class="sub" id="capst" style="margin-top:8px">Arrête-toi, capture, avance d’un petit pas (30–50 cm) ou tourne de 15–45°, recommence. Chaque scan doit revoir des murs déjà cartographiés.</div>
 <div class="row"><button id="undo">Annuler le dernier scan</button><button id="relocate">Recalculer les poses</button></div>
@@ -130,9 +130,9 @@ for(const[id,out,suf]of[['vmax','vv',' %'],['vturn','vt',' %'],['minpwm','mpv','
  $(id).addEventListener('input',()=>$(out).textContent=$(id).value+suf);
 
 // ---------- LiDAR en direct ----------
-function parseScan(text){const lines=text.split('\n'),m=/id=(\d+).*hz=([\d.]+).*pts=(\d+).*pwm=(\d+)/.exec(lines[0]||'');
+function parseScan(text){const lines=text.split('\n'),m=/id=(\d+).*hz=([\d.]+).*pts=(\d+).*pwm=(\d+)/.exec(lines[0]||''),moving=/(?:^|\s)moving=([01])(?:\s|$)/.exec(lines[0]||'');
  const pts=[];for(const l of lines){if(!/^[\d.]/.test(l))continue;const c=l.split(',');pts.push([+c[0],+c[1]/1000,+c[2]])}
- return{text,id:m?+m[1]:-1,hz:m?+m[2]:0,pwm:m?+m[4]:0,pts}}
+ return{text,id:m?+m[1]:-1,hz:m?+m[2]:0,pwm:m?+m[4]:0,moving:moving?moving[1]==='1':null,pts}}
 const lc=$('lidar'),lx=lc.getContext('2d');
 function drawLidar(){const[w,h,d]=sizeCanvas(lc),cx=w/2,cy=h/2,range=+$('zoom').value,s=(w/2-6*d)/range,mir=$('mirror').checked?-1:1;
  lx.clearRect(0,0,w,h);lx.strokeStyle='#26313f';lx.lineWidth=d;
@@ -143,7 +143,7 @@ function drawLidar(){const[w,h,d]=sizeCanvas(lc),cx=w/2,cy=h/2,range=+$('zoom').
   lx.fillStyle=i<40?'#ff8b8b':i<120?'#ffde73':'#f4f7fb';lx.fillRect(cx-mir*y*s-1.5*d,cy-x*s-1.5*d,3*d,3*d)}}
 $('zoom').addEventListener('input',drawLidar);$('mirror').onchange=drawLidar;
 addEventListener('resize',()=>{drawJoy();drawLidar()});
-(async function poll(){for(;;){try{const s=parseScan(await get('/api/robot/scan',7000));if(s.pts.length){scan=s;drawLidar();
+(async function poll(){for(;;){try{const s=parseScan(await get('/api/robot/scan',7000));autoSlam.observeMotion(s.moving);if(s.pts.length){scan=s;drawLidar();
   $('info').textContent=s.pts.length+' points · '+s.hz.toFixed(1)+' tours/s · tour n°'+s.id;
   if(document.activeElement!==$('lp')){$('lp').value=s.pwm;$('lpv').textContent=s.pwm+' %'}}
   status(true,'connecté')}catch(e){status(false,'robot injoignable')}await sleep(busy?80:250)}})();

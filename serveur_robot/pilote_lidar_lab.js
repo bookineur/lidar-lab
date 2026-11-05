@@ -50,7 +50,7 @@
 <div class="row"><label>Vitesse</label><input type="range" id="rwSpeed" min="20" max="100" value="40" style="flex:1"><span class="sub" id="rwSpeedV">40 %</span></div>
 <div class="actions"><button type="button" data-turn="45">⟲ 45°</button><button type="button" data-turn="15">⟲ 15°</button><button type="button" data-turn="-15">15° ⟳</button><button type="button" data-turn="-45">45° ⟳</button></div>
 <label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwLive" checked> Aperçu LiDAR en direct dans la vue</label>
-<label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwAuto"> Auto-SLAM : après chaque déplacement, prendre un scan et l’ajouter si le recalage est fiable</label>
+<label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwAuto" checked> Auto-SLAM : après chaque arrêt, prendre un scan et l’ajouter si le recalage est fiable</label>
 <label class="sub" style="display:block;margin-top:6px"><input type="checkbox" id="rwKeepRejected" checked> Garder les scans refusés en attente de recalage automatique</label>
 <div class="actions"><button type="button" class="primary" id="rwCapture">Capturer et ajouter à la carte</button><button type="button" id="rwUndo">Annuler le dernier scan</button><button type="button" id="rwRelocate">Recalculer les poses</button><button type="button" id="rwNew">Nouvelle séance</button></div>
 <div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus. En Auto-SLAM, chaque arrêt après déplacement lance une capture et un recalage; les poses incertaines restent hors de la carte.</div>
@@ -203,10 +203,12 @@
     (async function live() {
       for (;;) {
         if (q("rwLive").checked) {
-          try {
+        try {
             const raw = await get("/api/robot/scan", 7000),
-              m = raw.match(/id=(\d+)/);
+              m = raw.match(/id=(\d+)/),
+              moving = /(?:^|\s)moving=([01])(?:\s|$)/.exec(raw.split("\n")[0] || "");
             robotOk = true;
+            if (moving) autoSlam.observeMotion(moving[1] === "1");
             if (m && m[1] !== lastLiveId) {
               lastLiveId = m[1];
               const scan = parseCsv(raw, "apercu_robot.csv");

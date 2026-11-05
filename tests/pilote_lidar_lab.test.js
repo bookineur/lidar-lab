@@ -3,6 +3,34 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadRobotPanel } = require("./harness");
 
+test("panneau PC : Auto-SLAM actif par défaut et capture après un arrêt observé dans le flux LiDAR", async (t) => {
+  const h = loadRobotPanel();
+  t.after(() => h.close());
+  await h.wait(80);
+  assert.equal(h.el("rwAuto").checked, true, "le mode automatique est prêt dès l’ouverture");
+  h.setMoving(true);
+  await h.wait(350);
+  assert.equal(h.calls.filter((c) => c.method === "POST" && c.url === "/api/capture").length, 0, "pas de capture tant que le robot bouge");
+  h.setMoving(false);
+  await h.wait(800);
+  const captures = h.calls.filter((c) => c.method === "POST" && c.url === "/api/capture");
+  assert.equal(captures.length, 1, "un arrêt détecté dans le flux déclenche la capture sans événement clavier");
+  assert.equal(h.scans.length, 1);
+  assert.equal(h.scans[0].mapRegistered, true);
+});
+
+test("panneau PC : décocher Auto-SLAM empêche les captures automatiques", async (t) => {
+  const h = loadRobotPanel();
+  t.after(() => h.close());
+  await h.wait(80);
+  h.el("rwAuto").checked = false;
+  h.setMoving(true);
+  await h.wait(350);
+  h.setMoving(false);
+  await h.wait(800);
+  assert.equal(h.calls.filter((c) => c.method === "POST" && c.url === "/api/capture").length, 0);
+});
+
 test("panneau PC : Auto-SLAM capture après le relâchement d’une touche", async (t) => {
   const h = loadRobotPanel();
   t.after(() => h.close());

@@ -261,6 +261,7 @@ function loadRobotPanel(options = {}) {
     calls = [],
     session = { version: 0, name: "simu", dossier: "simu", robot: { url: "http://robot-lidar.local" }, scans: [] };
   let scanId = 0,
+    robotMoving = false,
     closed = false,
     renderCount = 0,
     selected = -1;
@@ -311,7 +312,7 @@ function loadRobotPanel(options = {}) {
     getElementById(id) { return elements.get(id) || null; },
     createElement(tag) { return tag === "section" ? card : addElement(tag); },
   };
-  const rawScan = (id) => `# robot_wifi id=${id} hz=10.0 pts=60 pwm=40 moving=0\nangle_deg,distance_mm,intensity\n` + Array.from({ length: 60 }, (_, i) => `${i * 6},1000,200`).join("\n") + "\n";
+  const rawScan = (id) => `# robot_wifi id=${id} hz=10.0 pts=60 pwm=40 moving=${robotMoving ? 1 : 0}\nangle_deg,distance_mm,intensity\n` + Array.from({ length: 60 }, (_, i) => `${i * 6},1000,200`).join("\n") + "\n";
   const jsonResponse = (body, ok = true) => ({ ok, json: async () => body, text: async () => JSON.stringify(body) });
   async function fetch(url, request = {}) {
     const parsed = new URL(url, "http://localhost"), route = parsed.pathname;
@@ -362,6 +363,7 @@ function loadRobotPanel(options = {}) {
     el: (id) => elements.get(id),
     key(name, event = {}) { for (const fn of listeners.get(name) || []) fn({ key: event.key || "ArrowUp", preventDefault() {}, ...event }); },
     turn(deg = 45) { const b = panelButtons.find((e) => e.dataset.turn === String(deg)); return b && b.onclick(); },
+    setMoving(value) { robotMoving = !!value; scanId++; },
     async wait(ms = 20) { await new Promise((resolve) => setTimeout(resolve, ms)); },
     close() { closed = true; for (const id of intervals) clearInterval(id); for (const id of timers) clearTimeout(id); },
   };
