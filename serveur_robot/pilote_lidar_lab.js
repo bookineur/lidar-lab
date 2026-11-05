@@ -55,8 +55,17 @@
 <div class="actions"><button type="button" class="primary" id="rwCapture">Capturer et ajouter à la carte</button><button type="button" id="rwUndo">Annuler le dernier scan</button><button type="button" id="rwRelocate">Recalculer les poses</button><button type="button" id="rwNew">Nouvelle séance</button></div>
 <div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus. En Auto-SLAM, chaque arrêt après déplacement lance une capture et un recalage; les poses incertaines restent hors de la carte.</div>
 <div class="sub" id="rwPhone" style="margin-top:6px"></div>`;
-    const first = document.querySelector("aside .card");
+    // Lidar Lab sur téléphone : la colonne unique ne doit pas être plus large que l'écran,
+    // et les longs chemins de dossier (sans espace) doivent passer à la ligne.
+    const css = document.createElement("style");
+    css.textContent =
+      "@media(max-width:780px){main{grid-template-columns:minmax(0,1fr)!important}main>*,aside>*{min-width:0;max-width:100%}input[type=file]{max-width:100%}}" +
+      "#robotWifiPc #rwFolder,#robotWifiPc #rwStatus,#robotWifiPc #rwMsg{overflow-wrap:anywhere}";
+    if (document.head && document.head.append) document.head.append(css);
+    const small = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width:780px)").matches;
+    const first = small ? null : document.querySelector("aside .card"); // téléphone : panneau en tête
     if (first && first.parentNode) first.parentNode.insertBefore(card, first.nextSibling);
+    else if (document.querySelector("aside")) document.querySelector("aside").prepend(card);
     else document.body.prepend(card);
     const q = (id) => document.getElementById(id);
     const msg = (t) => (q("rwMsg").textContent = t);
@@ -143,9 +152,15 @@
       if (wasMoving && captureAfterStop) scheduleAutoCapture();
       return stopped;
     }
+    // utilisables au doigt sur téléphone : pas de défilement, de zoom, de sélection ni de menu sur appui long
+    card.querySelectorAll("[data-move],#rwStop").forEach((b) => {
+      if (b.style) Object.assign(b.style, { touchAction: "none", userSelect: "none", webkitUserSelect: "none", webkitTouchCallout: "none", minHeight: "52px" });
+      if (b.addEventListener) b.addEventListener("contextmenu", (e) => e.preventDefault());
+    });
     card.querySelectorAll("[data-move]").forEach((b) => {
       const k = b.dataset.move;
       b.addEventListener("pointerdown", (e) => {
+        if (e && e.preventDefault) e.preventDefault();
         b.setPointerCapture(e.pointerId);
         press(k);
       });

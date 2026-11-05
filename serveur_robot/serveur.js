@@ -345,17 +345,22 @@ function sessionJson() {
   return { version, name: seance.name, dossier: seance.dir, settings: seance.settings, scans: seance.scans, robot: { url: ROBOT || "recherche…", online: robotOnline } };
 }
 const ROBOT_CMDS = new Set(["drive", "release", "stop", "turn", "config", "lidar"]);
+// Pendant la conduite, on lit le LiDAR moins souvent : le robot ne traite qu'une requête à la fois et un
+// scan (~6 ko) retarde les ordres de déplacement envoyés juste après (latence ressentie au téléphone).
+let lastMoveCmd = 0;
+const scanMaxAge = () => (Date.now() - lastMoveCmd < 1500 ? 900 : 150);
 
 async function handle(req, res) {
   const u = new URL(req.url, "http://localhost"),
     p = decodeURIComponent(u.pathname);
   try {
     // --- relais vers le robot ---
-    if (p === "/api/robot/scan") return send(res, 200, (await robotScan()).text, "text/csv; charset=utf-8");
+    if (p === "/api/robot/scan") return send(res, 200, (await robotScan(scanMaxAge())).text, "text/csv; charset=utf-8");
     if (p.startsWith("/api/robot/")) {
       const cmd = p.slice(11);
       if (!ROBOT_CMDS.has(cmd)) return send(res, 404, { erreur: "commande inconnue" });
       if (busy && (cmd === "drive" || cmd === "turn")) return send(res, 409, { erreur: "capture ou recalage en cours; commande de mouvement refusée" });
+      if (cmd === "drive" || cmd === "turn") lastMoveCmd = Date.now();
       return send(res, 200, await robotGet("/" + cmd + u.search, 1200), "text/plain; charset=utf-8");
     }
     // --- séance ---
@@ -419,14 +424,21 @@ async function handle(req, res) {
 
 if (require.main === module) {
 loadLatestSeance();
-http.createServer(handle).listen(PORT, "0.0.0.0", () => {
+const srv = http.createServer(handle);
+srv.on("error", (e) => {
+  if (e.code === "EADDRINUSE") console.error("Le port " + PORT + " est déjà utilisé par un autre programme (souvent « python -m http.server " + PORT + " », qui sert Lidar Lab SANS le robot). Ferme ce programme, ou lance : node serveur_robot/serveur.js --port " + (PORT + 1));
+  else console.error(e);
+  process.exit(1);
+});
+srv.listen(PORT, "0.0.0.0", () => {
   const ips = Object.values(os.networkInterfaces())
     .flat()
     .filter((i) => i && i.family === "IPv4" && !i.internal && !i.address.startsWith("169.254."))
     .map((i) => i.address);
   console.log("Lidar Lab + robot Wi-Fi");
   console.log("  Lidar Lab sur ce PC   : http://localhost:" + PORT);
-  for (const ip of ips) console.log("  Téléphone             : http://" + ip + ":" + PORT + "/telephone");
+  for (const ip of ips) console.log("  Téléphone (Lidar Lab) : http://" + ip + ":" + PORT + "/   (version simplifiée : /telephone)");
+  console.log("  Sur le PC, utilise bien CETTE adresse (port " + PORT + ") : un autre onglet Lidar Lab ne verrait pas les captures du téléphone.");
   console.log("  Robot                 : " + (ROBOT || "recherche automatique (robot-lidar.local, 192.168.4.1, réseau local)…") + " — le téléphone qui ouvre l’adresse du robot est renvoyé vers le PC");
   console.log("  Séance                : " + seance.dir);
   console.log("Ctrl+C pour arrêter.");
