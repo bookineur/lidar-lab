@@ -371,9 +371,20 @@
     }
     const step = Math.max(0.2, res * 4),
       angleStep = (15 * Math.PI) / 180;
-    for (let x = ox; x <= ox + w * res; x += step)
-      for (let y = oy; y <= oy + h * res; y += step)
-        for (let deg = -180; deg < 180; deg += 15) {
+    // options.around = {pose:[x,y,deg], xy, deg} : recherche LOCALE autour d'une estimation initiale
+    // (fenêtre ±xy m, ±deg °, pas plus fins) au lieu de toute la carte. Sans cette option : inchangé.
+    const around = options.around,
+      cStep = around ? Math.max(0.05, res * 2) : step,
+      lx0 = around ? around.pose[0] - around.xy : ox,
+      lx1 = around ? around.pose[0] + around.xy + 1e-9 : ox + w * res,
+      ly0 = around ? around.pose[1] - around.xy : oy,
+      ly1 = around ? around.pose[1] + around.xy + 1e-9 : oy + h * res,
+      dStep = around ? 5 : 15,
+      la0 = around ? around.pose[2] - around.deg : -180,
+      la1 = around ? around.pose[2] + around.deg + 1e-9 : 180 - 1e-9;
+    for (let x = lx0; x <= lx1; x += cStep)
+      for (let y = ly0; y <= ly1; y += cStep)
+        for (let deg = la0; deg <= la1; deg += dStep) {
           const a = (deg * Math.PI) / 180;
           let full = 0,
             capped = 0;
@@ -388,6 +399,12 @@
         }
     const top = [...topFull];
     for (const c of topCapped) if (!top.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 0.55 && angleDiff(q.a, c.a) < 0.35)) top.push(c);
+    // options.seeds = [[x,y,deg], …] : poses candidates supplémentaires (ex. résultat d'une recherche locale).
+    // Elles sont affinées et passent le MÊME test d'ambiguïté que les autres candidats. Sans option : inchangé.
+    for (const sd of options.seeds || []) {
+      const c = { x: sd[0], y: sd[1], a: (sd[2] * Math.PI) / 180 };
+      if (!top.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 0.05 && angleDiff(q.a, c.a) < 0.02)) top.push(c);
+    }
     if (!top.length) return { ok: false, reason: "aucun_candidat" };
     const finePoints = targetPoints.filter((_, i) => i % Math.max(1, Math.floor(targetPoints.length / 220)) === 0),
       inlierDist = Math.max(0.1, res * 2),
@@ -446,7 +463,143 @@
     return result;
   }
 
+  /** Heure de capture lue dans le nom (« scan_07_19h25m53.csv ») en secondes, sinon null. */
+  function captureSeconds(name) {
+    const m = String(name || "").match(/(\d{1,2})h(\d{2})m(\d{2})/);
+    return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null;
+  }
+
+  /** Paramètres de l'assemblage, fixés AVANT les essais sur les scans réels (ne pas les ajuster aux résultats). */
+  const ASSEMBLY_DEFAULTS = {
+    resolution: 0.05,
+    minOverlap: 0.35, // même seuil par défaut que « Recouvrement min » et l'Auto-SLAM
+    minPoints: 20, // en dessous : scan inexploitable (même seuil que la localisation manuelle)
+    localXY: 0.3, // fenêtre locale autour de la pose du scan précédent (article RoboCup MSL : ±0,2 m / ±15°)
+    localDeg: 20,
+    filter: { minRange: 0.05, maxRange: 12, minIntensity: 0 },
+    order: "capture", // "capture" : tri par l'heure lue dans le nom ; "fourni" : ordre donné
+  };
+
+  /** Localisation et construction automatiques d'une carte à partir de scans enregistrés (scan matching
+      successif, méthode du cours) : vérification des scans, tri dans l'ordre de capture, premier scan = origine
+      (0,0,0°), puis pour chaque scan : recherche LOCALE autour de la pose du dernier scan placé, sinon recherche
+      GLOBALE sur la carte cumulée (`locateScanOnGrid`, comme l'Auto-SLAM). Un scan n'est intégré que si son
+      recouvrement est suffisant et sa position non ambiguë ; sinon il est mis en attente et réessayé après
+      chaque nouveau placement, puis signalé. Aucun scan n'est intégré de force.
+      Générateur : produit un événement par décision (pour l'affichage progressif). Les scans fournis ne sont
+      jamais modifiés ; les poses sont dans les événements et dans le bilan final ({type:"fin", resultats}). */
+  function* assembleSteps(inputScans, options = {}) {
+    const o = { ...ASSEMBLY_DEFAULTS, ...options, filter: { ...ASSEMBLY_DEFAULTS.filter, ...(options.filter || {}) } };
+    const items = inputScans.map((scan, index) => ({ scan, index, name: scan.name, t: captureSeconds(scan.name), pose: null, attempts: 0 }));
+    const results = new Map();
+    const record = (it, fields) => {
+      const r = { nom: it.name, rang: it.index + 1, statut: "", methode: "", pose: null, recouvrement: null, ecart: null, rms_cm: null, ambigu: false, raison: "", essais: it.attempts, ...fields };
+      results.set(it, r);
+      return r;
+    };
+    // 1. vérification : format, nombre de points, doublons
+    const seen = new Map(),
+      valid = [];
+    for (const it of items) {
+      const pts = it.scan && it.scan.pts ? filterScanPoints(it.scan, o.filter) : [];
+      if (!it.scan || !Array.isArray(it.scan.pts)) {
+        yield { type: "invalide", ...record(it, { statut: "invalide", raison: "fichier illisible" }) };
+        continue;
+      }
+      if (it.scan.frame === "world") {
+        yield { type: "invalide", ...record(it, { statut: "invalide", raison: "coordonnées déjà en repère carte (x_m/y_m) : il faut le scan brut" }) };
+        continue;
+      }
+      if (pts.length < o.minPoints) {
+        yield { type: "invalide", ...record(it, { statut: "invalide", raison: `pas assez de points après nettoyage (${pts.length} < ${o.minPoints})` }) };
+        continue;
+      }
+      const sig = (it.scan.rawPts || it.scan.pts).map((p) => p.r.toFixed(4)).join(";");
+      if (seen.has(sig)) {
+        yield { type: "doublon", ...record(it, { statut: "doublon", raison: "mêmes mesures que " + seen.get(sig).name }) };
+        continue;
+      }
+      seen.set(sig, it);
+      it.pts = pts;
+      valid.push(it);
+    }
+    // 2. ordre de capture (heure dans le nom) si tous les scans valides en ont une
+    if (o.order === "capture" && valid.length && valid.every((it) => it.t !== null)) valid.sort((a, b) => a.t - b.t || a.index - b.index);
+    if (!valid.length) {
+      yield { type: "fin", resultats: items.map((it) => results.get(it)), places: 0 };
+      return;
+    }
+    // 3. origine
+    const placed = [];
+    const origin = valid[0];
+    origin.pose = [0, 0, 0];
+    placed.push(origin);
+    yield { type: "origine", ...record(origin, { statut: "origine", methode: "origine", pose: [0, 0, 0], raison: "premier scan = repère (0, 0, 0°)" }) };
+    // 4. scans suivants
+    const tryPlace = (it) => {
+      it.attempts++;
+      const refs = placed.map((p) => ({ ...p.scan, pose: p.pose }));
+      const g = cellsToGrid(computeGridCells(refs, (s) => filterScanPoints(s, o.filter), o.resolution), o.resolution);
+      if (!g || g.occupied < 10) return { ok: false, statut: "refusé", raison: "carte précédente trop pauvre" };
+      // a) recherche locale autour de la pose du dernier scan placé : donne une pose candidate ;
+      // b) recherche globale sur toute la carte, avec ce candidat ajouté comme graine : la décision
+      //    (recouvrement + ambiguïté) est prise sur l'ensemble des candidats, la locale ne la contourne jamais.
+      const prev = placed[placed.length - 1].pose;
+      const loc = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, around: { pose: prev, xy: o.localXY, deg: o.localDeg } });
+      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [] });
+      const near = (p) => p && Math.hypot(p[0] - prev[0], p[1] - prev[1]) <= o.localXY + 0.05 && Math.abs(((p[2] - prev[2] + 540) % 360) - 180) <= o.localDeg + 1;
+      const methode = near(r.pose) ? "locale" : "globale";
+      const fields = { recouvrement: r.overlap, ecart: r.gap, rms_cm: Number.isFinite(r.inlierRms) ? r.inlierRms * 100 : null, ambigu: !!r.ambiguous };
+      if (!r.ok)
+        return {
+          ok: false,
+          ...fields,
+          raison: r.reason === "grille_vide" ? "carte précédente trop pauvre" : r.ambiguous ? "plusieurs positions possibles (ambigu)" : `trop peu de murs communs (${Math.round((r.overlap || 0) * 100)} % < ${Math.round(o.minOverlap * 100)} %)`,
+        };
+      return { ok: true, ...fields, methode, pose: r.pose };
+    };
+    const pending = [];
+    function* settle(it) {
+      const r = tryPlace(it);
+      if (r.ok) {
+        it.pose = r.pose;
+        placed.push(it);
+        yield { type: "place", ...record(it, { statut: "placé", methode: r.methode, pose: r.pose, recouvrement: r.recouvrement, ecart: r.ecart, rms_cm: r.rms_cm, essais: it.attempts }) };
+        return true;
+      }
+      yield { type: "refuse", ...record(it, { statut: "refusé", recouvrement: r.recouvrement ?? null, ecart: r.ecart ?? null, rms_cm: r.rms_cm ?? null, ambigu: !!r.ambigu, raison: r.raison, essais: it.attempts }) };
+      return false;
+    }
+    for (const it of valid.slice(1)) {
+      if (yield* settle(it)) {
+        // un nouveau scan agrandit la carte : on réessaie ceux en attente
+        let progress = true;
+        while (progress && pending.length) {
+          progress = false;
+          for (const w of [...pending])
+            if (yield* settle(w)) {
+              pending.splice(pending.indexOf(w), 1);
+              progress = true;
+            }
+        }
+      } else pending.push(it);
+    }
+    const res = items.map((it) => results.get(it));
+    yield { type: "fin", resultats: res, places: res.filter((r) => r.statut === "placé" || r.statut === "origine").length, ordre: valid.map((it) => it.name) };
+  }
+
+  /** Version non progressive : exécute tout l'assemblage et renvoie le bilan {resultats, places, ordre}. */
+  function assembleSession(scans, options = {}) {
+    let last = null;
+    for (const ev of assembleSteps(scans, options)) last = ev;
+    return last;
+  }
+
   return {
+    assembleSteps,
+    assembleSession,
+    captureSeconds,
+    ASSEMBLY_DEFAULTS,
     parseCsv,
     parseGridCsv,
     transformed,
