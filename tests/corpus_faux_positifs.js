@@ -57,9 +57,9 @@ function runCase(name, seed) {
 }
 
 /** Rejoue la décision de locateScanOnGrid (même fonction chooseCandidate) pour un couple de seuils. */
-function outcome(c, maxFreeHit, maxWallCross, overlapAmbiguity = false) {
+function outcome(c, maxFreeHit, maxWallCross, overlapAmbiguity = false, maxContradiction = Infinity) {
   if (!c.cands.length) return "refus";
-  const ch = LC.chooseCandidate(c.cands, { minOverlap: LC.ASSEMBLY_DEFAULTS.minOverlap, maxFreeHit, maxWallCross, overlapAmbiguity });
+  const ch = LC.chooseCandidate(c.cands, { minOverlap: LC.ASSEMBLY_DEFAULTS.minOverlap, maxFreeHit, maxWallCross, overlapAmbiguity, maxContradiction });
   if (!ch.ok) return "refus";
   if (c.doitRefuser) return "faux_positif";
   const deg = (ch.best.a * 180) / Math.PI;
@@ -67,10 +67,10 @@ function outcome(c, maxFreeHit, maxWallCross, overlapAmbiguity = false) {
   return good ? "bonne_pose" : "faux_positif";
 }
 
-function tally(cases, a, b, overlapAmbiguity = false) {
+function tally(cases, a, b, overlapAmbiguity = false, maxContradiction = Infinity) {
   const t = { bonne_pose: 0, faux_positif: 0, refus: 0, parScenario: {} };
   for (const c of cases) {
-    const o = outcome(c, a, b, overlapAmbiguity);
+    const o = outcome(c, a, b, overlapAmbiguity, maxContradiction);
     t[o]++;
     const p = (t.parScenario[c.name] = t.parScenario[c.name] || { bonne_pose: 0, faux_positif: 0, refus: 0 });
     p[o]++;

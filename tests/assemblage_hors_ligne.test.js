@@ -130,7 +130,9 @@ test("A7. scan refusé puis réessayé : placé dès qu'un scan intermédiaire a
   checkAgainstTruth(b.resultats, { "scan_A_10h00m00.csv": PATH[0], "scan_C_10h01m00.csv": PATH[7], "scan_B_10h02m00.csv": PATH[3] }, 0.06, 1.5);
 });
 
-test("A7b. salle en L : un scan du bras étroit ne doit pas être placé dans la première zone", { todo: "faux positif restant : corrigé seulement par le test d'espace libre, désactivé car il déplace des scans réels (voir tests/resultats_faux_positifs.md)" }, () => {
+// Étape 4 : la pose fausse (bras du L sur la bande de départ) met environ 23 % de ses points dans du vide confirmé ;
+// elle est refusée par le contrôle de contradiction (seuil 14,2 %, réglé sur la séance réelle), sans changer de candidat.
+test("A7b. salle en L : un scan du bras étroit ne doit pas être placé dans la première zone", () => {
   const L = [S.seg(0, 0, 8, 0), S.seg(8, 0, 8, 6), S.seg(8, 6, 6, 6), S.seg(6, 6, 6, 2), S.seg(6, 2, 0, 2), S.seg(0, 2, 0, 0), ...S.rect(7.2, 4.6, 7.8, 5.2, "poteau"), ...S.rect(2.5, 0.0, 3.0, 0.4, "meuble")];
   const truth = { "scan_01_09h00m00.csv": [1, 1, 0], "scan_02_09h00m10.csv": [7, 5.2, 90], "scan_03_09h00m20.csv": [7, 1, 45] };
   const b = LC.assembleSession(Object.entries(truth).map(([n, p], k) => scanOf(p, k, L, n)));
@@ -236,7 +238,7 @@ test("A13. sans freeSpaceCheck, locateScanOnGrid ne calcule aucun indicateur de 
   assert.strictEqual(LC.ASSEMBLY_DEFAULTS.freeSpace, null, "désactivé par défaut tant qu'aucun seuil n'est validé");
 });
 
-test("A14. l'ambiguïté par recouvrement ne fait qu'ajouter des refus : jamais une autre pose acceptée", () => {
+test("A14. l'ambiguïté par recouvrement et le refus par contradiction ne font qu'ajouter des refus : jamais une autre pose acceptée", () => {
   // propriété de sûreté : sur les candidats réels du corpus, une pose acceptée AVEC le critère est la même
   // que celle acceptée SANS ; le critère ne peut que transformer une acceptation en refus.
   const C = require("./corpus_faux_positifs.js");
@@ -245,12 +247,15 @@ test("A14. l'ambiguïté par recouvrement ne fait qu'ajouter des refus : jamais 
       const c = C.runCase(name, seed);
       if (!c.cands.length) continue;
       const o = { minOverlap: LC.ASSEMBLY_DEFAULTS.minOverlap };
-      const without = LC.chooseCandidate(c.cands, { ...o, overlapAmbiguity: false }),
-        withA = LC.chooseCandidate(c.cands, { ...o, overlapAmbiguity: true });
-      if (withA.ok) {
-        assert.ok(without.ok, name + " " + seed);
-        assert.strictEqual(withA.best, without.best, name + " " + seed);
+      const without = LC.chooseCandidate(c.cands, { ...o, overlapAmbiguity: false });
+      for (const extra of [{ overlapAmbiguity: true }, { maxContradiction: 0.142 }, { overlapAmbiguity: true, maxContradiction: 0.142 }]) {
+        const withA = LC.chooseCandidate(c.cands, { ...o, ...extra });
+        if (withA.ok) {
+          assert.ok(without.ok, name + " " + seed + " " + JSON.stringify(extra));
+          assert.strictEqual(withA.best, without.best, name + " " + seed + " " + JSON.stringify(extra));
+        }
       }
     }
   assert.strictEqual(LC.ASSEMBLY_DEFAULTS.overlapAmbiguity, true);
+  assert.deepStrictEqual(LC.ASSEMBLY_DEFAULTS.contradiction, { maxFreeHit: 0.142 });
 });

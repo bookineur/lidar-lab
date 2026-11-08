@@ -456,9 +456,11 @@
     }
     // options.freeSpaceCheck = {cells, res, maxFreeHit, maxWallCross} : test de cohérence avec l'espace libre
     // (voir freeSpaceConsistency). Sans cette option : choix et résultat inchangés.
-    const fsc = options.freeSpaceCheck;
-    if (fsc) for (const q of finals) Object.assign(q, freeSpaceConsistency(finePoints, [q.x, q.y, (q.a * 180) / Math.PI], fsc.cells, fsc.res));
-    const choice = chooseCandidate(finals, { minOverlap, maxFreeHit: fsc ? fsc.maxFreeHit : undefined, maxWallCross: fsc ? fsc.maxWallCross : undefined, overlapAmbiguity: !!options.overlapAmbiguity });
+    const fsc = options.freeSpaceCheck,
+      cc = options.contradictionCheck; // {cells, res, maxFreeHit} : refus APRÈS le choix si la pose retenue contredit la carte
+    const fsData = fsc || cc;
+    if (fsData) for (const q of finals) Object.assign(q, freeSpaceConsistency(finePoints, [q.x, q.y, (q.a * 180) / Math.PI], fsData.cells, fsData.res));
+    const choice = chooseCandidate(finals, { minOverlap, maxFreeHit: fsc ? fsc.maxFreeHit : undefined, maxWallCross: fsc ? fsc.maxWallCross : undefined, overlapAmbiguity: !!options.overlapAmbiguity, maxContradiction: cc ? cc.maxFreeHit : undefined });
     const best = choice.best,
       overlap = best.overlap,
       inlierRms = best.inlierRms,
@@ -469,7 +471,7 @@
       pose = [best.x, best.y, (((best.a * 180) / Math.PI + 540) % 360) - 180];
     const ok = choice.ok;
     const result = { ok, reason: choice.reason, pose, mean, overlap, inlierRms, gap, ambiguous, quality, minOverlap };
-    if (fsc) Object.assign(result, { freeHit: best.freeHit, wallCross: best.wallCross, incoherent: choice.incoherent });
+    if (fsData) Object.assign(result, { freeHit: best.freeHit, wallCross: best.wallCross, incoherent: choice.incoherent, contradicted: !!choice.contradicted });
     if (options.debug)
       result.candidates = finals.map((q) => ({ x: q.x, y: q.y, deg: (q.a * 180) / Math.PI, a: q.a, cost: q.cost, overlap: q.overlap, n: q.n, inlierRms: q.inlierRms, freeHit: q.freeHit, wallCross: q.wallCross }));
     return result;
@@ -500,8 +502,15 @@
       rival = pool.find((q) => far(q) && q.overlap >= best.overlap - delta) || null;
       if (rival) ambiguous = true;
     }
-    const ok = !ambiguous && best.overlap >= o.minOverlap;
-    return { best, next, rival, gap, ambiguous, incoherent: false, ok, reason: ok ? "" : ambiguous ? "ambigu" : "recouvrement" };
+    let ok = !ambiguous && best.overlap >= o.minOverlap,
+      contradicted = false;
+    // o.maxContradiction : la pose RETENUE est refusée si trop de ses points tombent dans du vide confirmé de la carte.
+    // Appliqué après le choix, sans jamais passer à un autre candidat : ne peut qu'ajouter des refus.
+    if (ok && Number.isFinite(o.maxContradiction) && best.freeHit > o.maxContradiction) {
+      ok = false;
+      contradicted = true;
+    }
+    return { best, next, rival, gap, ambiguous, incoherent: false, contradicted, ok, reason: ok ? "" : contradicted ? "contradiction" : ambiguous ? "ambigu" : "recouvrement" };
   }
 
   // Cellules « confirmées » de la grid map log-odds : au moins deux observations nettes dans le même sens
@@ -589,6 +598,10 @@
     freeSpace: null,
     // ambiguïté aussi jugée sur le recouvrement (voir chooseCandidate) ; false = règle de l'Auto-SLAM seule
     overlapAmbiguity: true,
+    // refus d'une pose retenue qui contredit l'espace libre confirmé : {maxFreeHit} ou null (désactivé)
+    // seuil réglé sur la séance réelle du 04/11 (règle annoncée : 1,5 × la plus forte part de points dans du vide
+    // parmi les 30 scans placés en accord avec l'Auto-SLAM, max 9,49 %) ; voir tests/resultats_faux_positifs.md
+    contradiction: { maxFreeHit: 0.142 },
   };
 
   /** Localisation et construction automatiques d'une carte à partir de scans enregistrés (scan matching
@@ -659,7 +672,8 @@
       const prev = placed[placed.length - 1].pose;
       const loc = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, around: { pose: prev, xy: o.localXY, deg: o.localDeg } });
       const fsc = o.freeSpace ? { cells, res: o.resolution, maxFreeHit: o.freeSpace.maxFreeHit, maxWallCross: o.freeSpace.maxWallCross } : undefined;
-      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [], freeSpaceCheck: fsc, overlapAmbiguity: o.overlapAmbiguity });
+      const ccheck = o.contradiction ? { cells, res: o.resolution, maxFreeHit: o.contradiction.maxFreeHit } : undefined;
+      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [], freeSpaceCheck: fsc, overlapAmbiguity: o.overlapAmbiguity, contradictionCheck: ccheck });
       const near = (p) => p && Math.hypot(p[0] - prev[0], p[1] - prev[1]) <= o.localXY + 0.05 && Math.abs(((p[2] - prev[2] + 540) % 360) - 180) <= o.localDeg + 1;
       const methode = near(r.pose) ? "locale" : "globale";
       const fields = { recouvrement: r.overlap, ecart: r.gap, rms_cm: Number.isFinite(r.inlierRms) ? r.inlierRms * 100 : null, ambigu: !!r.ambiguous, libre: r.freeHit ?? null, traverse: r.wallCross ?? null };
@@ -667,7 +681,7 @@
         return {
           ok: false,
           ...fields,
-          raison: r.reason === "grille_vide" ? "carte précédente trop pauvre" : r.reason === "incoherent" ? `incohérent avec la carte : ${Math.round((r.freeHit || 0) * 100)} % de points dans du vide confirmé, ${Math.round((r.wallCross || 0) * 100)} % de rayons à travers un mur` : r.ambiguous ? "plusieurs positions possibles (ambigu)" : `trop peu de murs communs (${Math.round((r.overlap || 0) * 100)} % < ${Math.round(o.minOverlap * 100)} %)`,
+          raison: r.reason === "grille_vide" ? "carte précédente trop pauvre" : r.reason === "contradiction" ? `contredit la carte : ${Math.round((r.freeHit || 0) * 100)} % de points dans du vide confirmé` : r.reason === "incoherent" ? `incohérent avec la carte : ${Math.round((r.freeHit || 0) * 100)} % de points dans du vide confirmé, ${Math.round((r.wallCross || 0) * 100)} % de rayons à travers un mur` : r.ambiguous ? "plusieurs positions possibles (ambigu)" : `trop peu de murs communs (${Math.round((r.overlap || 0) * 100)} % < ${Math.round(o.minOverlap * 100)} %)`,
         };
       return { ok: true, ...fields, methode, pose: r.pose };
     };

@@ -133,3 +133,39 @@ Le critère de réussite « 0 faux positif » **n’est pas atteint** : 2 faux p
 - **Limite restante** : bras étroit d’une salle en L (47 faux positifs sur 100 graines avec l’ambiguïté seule) — test A7b laissé « à faire ».
 
 Mesures du 08/11/2026. Scans simulés sauf la séance réelle du 04/11.
+
+---
+
+# Étape 4 — refus d’une pose qui contredit l’espace libre (après le choix)
+
+## Règle annoncée avant la mesure
+
+- La pose **retenue** (même choix qu’avant, aucun filtrage des candidats) est refusée si la part de ses points qui tombent dans du vide confirmé dépasse un seuil. On ne passe **jamais** à un autre candidat : ce contrôle ne peut qu’ajouter des refus (test A14).
+- **Seuil réglé sur les vraies données** : 1,5 × la plus forte part observée parmi les scans de la séance du 04/11 placés en accord avec l’Auto-SLAM (< 10 cm et < 2°).
+- **Évaluation** sur des données non utilisées pour ce réglage : corpus simulé (graines 101 à 200), `repetition_tp2` et les 12 scans du premier essai du 04/11.
+
+## Réglage sur la séance réelle
+
+30 scans concordants. La part de points dans du vide confirmé va de 0 à **9.5 %** (en simulation, la bonne pose en a environ 0 %). Le vrai LD06 produit donc des points « dans le vide » même à la bonne pose. Seuil = 1,5 × 9.49 % = **14,2 %**.
+
+## Évaluation
+
+| Jeu | Ambiguïté seule (étape 3) | + refus par contradiction (étape 4) |
+|---|---|---|
+| Corpus simulé 101–200 : bonnes / faux positifs / refus | 200 / **48** / 352 | 200 / **2** / 398 |
+| dont salle en L | 0 / 47 / 53 | 0 / 1 / 99 |
+| `repetition_tp2` (vérité connue) | 15 bonnes, 0 faux positif | 15 bonnes, 0 faux positif |
+| Premier essai du 04/11 (12 scans, sans vérité) | 12/12 placés | 12/12 placés, mêmes poses à quelques cm près |
+| Séance réelle du 04/11 (réglage) | 37 placés | 37 placés ; un seul écart ≥ 10 cm avec l’Auto-SLAM : scan_28 4.08m |
+
+## Critères annoncés
+
+- 0 faux positif dans la salle en L : **non atteint** (1 sur 100, contre 47). Faux positifs ailleurs : pas plus qu’avant (1 en symétrie centrale, déjà présent).
+- Séance réelle : ≥ 30 des 37 scans encore placés : **atteint** (37). « Aucun scan placé loin de l’Auto-SLAM » : **non atteint**, le scan 28 reste à 4,1 m. Cet écart existait déjà à l’étape 3, et l’Auto-SLAM avait accepté ce scan avec seulement 53 % de recouvrement : sans vérité terrain, on ne sait pas qui a raison.
+- `repetition_tp2` : 15 bonnes poses sur 15 conservées : **atteint**.
+
+## Bilan cumulé (corpus simulé 101–200, 600 cas)
+
+Faux positifs : 255 (étape 1) → 48 (étape 3) → **2** (étape 4), sans perte de bonnes poses (200). Restent : 1 salle en L, 1 symétrie centrale. Le test d’espace libre utilisé comme filtre (étape 2) reste désactivé.
+
+Mesures du 08/11/2026.
