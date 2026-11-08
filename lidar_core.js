@@ -439,28 +439,118 @@
       finals.push(best);
     }
     finals.sort((a, b) => a.cost - b.cost);
-    const best = finals[0],
-      next = finals.find((q) => Math.hypot(q.x - best.x, q.y - best.y) > 0.6 || angleDiff(q.a, best.a) > 0.4);
-    let inliers = 0,
-      inlierSq = 0;
-    for (const p of finePoints) {
-      const d = distanceAt(best.x, best.y, best.a, p);
-      if (d <= inlierDist) {
-        inliers++;
-        inlierSq += d * d;
+    // recouvrement de chaque candidat (part des points à moins de inlierDist d'un mur de la carte)
+    for (const q of finals) {
+      let inliers = 0,
+        inlierSq = 0;
+      for (const p of finePoints) {
+        const d = distanceAt(q.x, q.y, q.a, p);
+        if (d <= inlierDist) {
+          inliers++;
+          inlierSq += d * d;
+        }
       }
+      q.overlap = inliers / finePoints.length;
+      q.inlierRms = inliers ? Math.sqrt(inlierSq / inliers) : Infinity;
     }
-    const overlap = inliers / finePoints.length,
-      inlierRms = inliers ? Math.sqrt(inlierSq / inliers) : Infinity,
+    // options.freeSpaceCheck = {cells, res, maxFreeHit, maxWallCross} : test de cohérence avec l'espace libre
+    // (voir freeSpaceConsistency). Sans cette option : choix et résultat inchangés.
+    const fsc = options.freeSpaceCheck;
+    if (fsc) for (const q of finals) Object.assign(q, freeSpaceConsistency(finePoints, [q.x, q.y, (q.a * 180) / Math.PI], fsc.cells, fsc.res));
+    const choice = chooseCandidate(finals, { minOverlap, maxFreeHit: fsc ? fsc.maxFreeHit : undefined, maxWallCross: fsc ? fsc.maxWallCross : undefined });
+    const best = choice.best,
+      overlap = best.overlap,
+      inlierRms = best.inlierRms,
       mean = Math.sqrt(score(best.x, best.y, best.a, finePoints)),
-      gap = next ? Math.max(0, (next.cost - best.cost) / Math.max(next.cost, 1e-9)) : 1,
-      ambiguous = !!next && gap < 0.08,
+      gap = choice.gap,
+      ambiguous = choice.ambiguous,
       quality = overlap >= 0.7 && gap > 0.15 ? "Bonne" : overlap >= 0.5 ? "Moyenne" : "Faible",
       pose = [best.x, best.y, (((best.a * 180) / Math.PI + 540) % 360) - 180];
-    const ok = !ambiguous && overlap >= minOverlap;
-    const result = { ok, reason: ok ? "" : ambiguous ? "ambigu" : "recouvrement", pose, mean, overlap, inlierRms, gap, ambiguous, quality, minOverlap };
-    if (options.debug) result.candidates = finals.map((q) => ({ x: q.x, y: q.y, deg: (q.a * 180) / Math.PI, cost: q.cost }));
+    const ok = choice.ok;
+    const result = { ok, reason: choice.reason, pose, mean, overlap, inlierRms, gap, ambiguous, quality, minOverlap };
+    if (fsc) Object.assign(result, { freeHit: best.freeHit, wallCross: best.wallCross, incoherent: choice.incoherent });
+    if (options.debug)
+      result.candidates = finals.map((q) => ({ x: q.x, y: q.y, deg: (q.a * 180) / Math.PI, a: q.a, cost: q.cost, overlap: q.overlap, inlierRms: q.inlierRms, freeHit: q.freeHit, wallCross: q.wallCross }));
     return result;
+  }
+
+  /** Choix de la pose parmi les candidats affinés (triés par coût croissant), règle de locateScanOnGrid :
+      meilleur candidat ; ambigu si un candidat éloigné (> 0,6 m ou > 0,4 rad) a un coût proche (écart < 8 %) ;
+      accepté si non ambigu et recouvrement >= minOverlap. Avec maxFreeHit / maxWallCross, seuls les candidats
+      COHÉRENTS avec l'espace libre de la carte sont considérés (pour le choix ET pour l'ambiguïté) ; s'il n'y en a
+      aucun, le scan est refusé (« incohérent »). Exportée pour rejouer exactement cette règle (calibration). */
+  function chooseCandidate(cands, o) {
+    const check = Number.isFinite(o.maxFreeHit) || Number.isFinite(o.maxWallCross),
+      pool = check ? cands.filter((q) => !(q.freeHit > o.maxFreeHit) && !(q.wallCross > o.maxWallCross)) : cands;
+    if (!pool.length) return { best: cands[0], next: null, gap: 0, ambiguous: false, incoherent: true, ok: false, reason: "incoherent" };
+    const best = pool[0],
+      next = pool.find((q) => Math.hypot(q.x - best.x, q.y - best.y) > 0.6 || angleDiff(q.a, best.a) > 0.4),
+      gap = next ? Math.max(0, (next.cost - best.cost) / Math.max(next.cost, 1e-9)) : 1,
+      ambiguous = !!next && gap < 0.08,
+      ok = !ambiguous && best.overlap >= o.minOverlap;
+    return { best, next, gap, ambiguous, incoherent: false, ok, reason: ok ? "" : ambiguous ? "ambigu" : "recouvrement" };
+  }
+
+  // Cellules « confirmées » de la grid map log-odds : au moins deux observations nettes dans le même sens
+  const FREE_CONFIRMED = -2 * FREE_STEP, // -0,8 : deux passages de rayon sans impact
+    OCC_CONFIRMED = 2 * HIT_STEP; // 1,7 : deux impacts
+
+  /** Cohérence d'une pose avec l'espace libre d'une grid map (cells = Map log-odds de computeGridCells).
+      - freeHit : part des points qui tombent dans une zone confirmée LIBRE (la cellule et ses 8 voisines,
+        marge d'une cellule pour le bruit) : à la bonne pose, un mur ne peut pas être là où d'autres scans ont vu du vide ;
+      - wallCross : part des rayons qui TRAVERSENT une cellule confirmée OCCUPÉE avant leur impact (les 2 dernières
+        cellules avant l'impact sont ignorées, marge pour le bruit) : un laser ne traverse pas un mur.
+      Les cellules inconnues ou vues une seule fois ne comptent pas (porte ouverte, personne qui passe). */
+  function freeSpaceConsistency(points, pose, cells, res) {
+    const L = (cx, cy) => cells.get(cx + "," + cy);
+    const isFree = (cx, cy) => {
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++) {
+          const v = L(cx + dx, cy + dy);
+          if (v === undefined || v > FREE_CONFIRMED) return false;
+        }
+      return true;
+    };
+    const sx0 = Math.floor(pose[0] / res),
+      sy0 = Math.floor(pose[1] / res);
+    let free = 0,
+      cross = 0;
+    for (const p of points) {
+      const w = transformed(p, pose),
+        x1 = Math.floor(w[0] / res),
+        y1 = Math.floor(w[1] / res);
+      if (isFree(x1, y1)) free++;
+      // Bresenham du robot à l'impact (même tracé que computeGridCells)
+      const path = [];
+      let x = sx0,
+        y = sy0,
+        dx = Math.abs(x1 - x),
+        sx = x < x1 ? 1 : -1,
+        dy = -Math.abs(y1 - y),
+        sy = y < y1 ? 1 : -1,
+        err = dx + dy;
+      while (x !== x1 || y !== y1) {
+        path.push([x, y]);
+        const e = 2 * err;
+        if (e >= dy) {
+          err += dy;
+          x += sx;
+        }
+        if (e <= dx) {
+          err += dx;
+          y += sy;
+        }
+      }
+      for (let i = 0; i < path.length - 2; i++) {
+        const v = L(path[i][0], path[i][1]);
+        if (v !== undefined && v >= OCC_CONFIRMED) {
+          cross++;
+          break;
+        }
+      }
+    }
+    const n = Math.max(1, points.length);
+    return { freeHit: free / n, wallCross: cross / n };
   }
 
   /** Heure de capture lue dans le nom (« scan_07_19h25m53.csv ») en secondes, sinon null. */
@@ -478,6 +568,8 @@
     localDeg: 20,
     filter: { minRange: 0.05, maxRange: 12, minIntensity: 0 },
     order: "capture", // "capture" : tri par l'heure lue dans le nom ; "fourni" : ordre donné
+    // test de cohérence avec l'espace libre (freeSpaceConsistency) : {maxFreeHit, maxWallCross} ou null (désactivé)
+    freeSpace: null,
   };
 
   /** Localisation et construction automatiques d'une carte à partir de scans enregistrés (scan matching
@@ -539,22 +631,24 @@
     const tryPlace = (it) => {
       it.attempts++;
       const refs = placed.map((p) => ({ ...p.scan, pose: p.pose }));
-      const g = cellsToGrid(computeGridCells(refs, (s) => filterScanPoints(s, o.filter), o.resolution), o.resolution);
+      const cells = computeGridCells(refs, (s) => filterScanPoints(s, o.filter), o.resolution),
+        g = cellsToGrid(cells, o.resolution);
       if (!g || g.occupied < 10) return { ok: false, statut: "refusé", raison: "carte précédente trop pauvre" };
       // a) recherche locale autour de la pose du dernier scan placé : donne une pose candidate ;
       // b) recherche globale sur toute la carte, avec ce candidat ajouté comme graine : la décision
       //    (recouvrement + ambiguïté) est prise sur l'ensemble des candidats, la locale ne la contourne jamais.
       const prev = placed[placed.length - 1].pose;
       const loc = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, around: { pose: prev, xy: o.localXY, deg: o.localDeg } });
-      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [] });
+      const fsc = o.freeSpace ? { cells, res: o.resolution, maxFreeHit: o.freeSpace.maxFreeHit, maxWallCross: o.freeSpace.maxWallCross } : undefined;
+      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [], freeSpaceCheck: fsc });
       const near = (p) => p && Math.hypot(p[0] - prev[0], p[1] - prev[1]) <= o.localXY + 0.05 && Math.abs(((p[2] - prev[2] + 540) % 360) - 180) <= o.localDeg + 1;
       const methode = near(r.pose) ? "locale" : "globale";
-      const fields = { recouvrement: r.overlap, ecart: r.gap, rms_cm: Number.isFinite(r.inlierRms) ? r.inlierRms * 100 : null, ambigu: !!r.ambiguous };
+      const fields = { recouvrement: r.overlap, ecart: r.gap, rms_cm: Number.isFinite(r.inlierRms) ? r.inlierRms * 100 : null, ambigu: !!r.ambiguous, libre: r.freeHit ?? null, traverse: r.wallCross ?? null };
       if (!r.ok)
         return {
           ok: false,
           ...fields,
-          raison: r.reason === "grille_vide" ? "carte précédente trop pauvre" : r.ambiguous ? "plusieurs positions possibles (ambigu)" : `trop peu de murs communs (${Math.round((r.overlap || 0) * 100)} % < ${Math.round(o.minOverlap * 100)} %)`,
+          raison: r.reason === "grille_vide" ? "carte précédente trop pauvre" : r.reason === "incoherent" ? `incohérent avec la carte : ${Math.round((r.freeHit || 0) * 100)} % de points dans du vide confirmé, ${Math.round((r.wallCross || 0) * 100)} % de rayons à travers un mur` : r.ambiguous ? "plusieurs positions possibles (ambigu)" : `trop peu de murs communs (${Math.round((r.overlap || 0) * 100)} % < ${Math.round(o.minOverlap * 100)} %)`,
         };
       return { ok: true, ...fields, methode, pose: r.pose };
     };
@@ -564,10 +658,10 @@
       if (r.ok) {
         it.pose = r.pose;
         placed.push(it);
-        yield { type: "place", ...record(it, { statut: "placé", methode: r.methode, pose: r.pose, recouvrement: r.recouvrement, ecart: r.ecart, rms_cm: r.rms_cm, essais: it.attempts }) };
+        yield { type: "place", ...record(it, { statut: "placé", methode: r.methode, pose: r.pose, recouvrement: r.recouvrement, ecart: r.ecart, rms_cm: r.rms_cm, libre: r.libre, traverse: r.traverse, essais: it.attempts }) };
         return true;
       }
-      yield { type: "refuse", ...record(it, { statut: "refusé", recouvrement: r.recouvrement ?? null, ecart: r.ecart ?? null, rms_cm: r.rms_cm ?? null, ambigu: !!r.ambigu, raison: r.raison, essais: it.attempts }) };
+      yield { type: "refuse", ...record(it, { statut: "refusé", recouvrement: r.recouvrement ?? null, ecart: r.ecart ?? null, rms_cm: r.rms_cm ?? null, ambigu: !!r.ambigu, libre: r.libre ?? null, traverse: r.traverse ?? null, raison: r.raison, essais: it.attempts }) };
       return false;
     }
     for (const it of valid.slice(1)) {
@@ -598,6 +692,8 @@
   return {
     assembleSteps,
     assembleSession,
+    chooseCandidate,
+    freeSpaceConsistency,
     captureSeconds,
     ASSEMBLY_DEFAULTS,
     parseCsv,

@@ -208,3 +208,31 @@ test("A11. vraie séance du 04/11 (40 scans LD06) : chaque scan reçoit un statu
     if (r.statut === "refusé") assert.ok(r.raison && !r.pose, r.nom);
   }
 });
+
+test("A12. cohérence avec l'espace libre : nulle à la bonne pose, forte à la fausse pose du bras de L", () => {
+  const L = [S.seg(0, 0, 8, 0), S.seg(8, 0, 8, 6), S.seg(8, 6, 6, 6), S.seg(6, 6, 6, 2), S.seg(6, 2, 0, 2), S.seg(0, 2, 0, 0), ...S.rect(7.2, 4.6, 7.8, 5.2, "poteau"), ...S.rect(2.5, 0.0, 3.0, 0.4, "meuble")];
+  const f = LC.ASSEMBLY_DEFAULTS.filter,
+    res = LC.ASSEMBLY_DEFAULTS.resolution;
+  const refs = [[1, 1, 0], [7, 1, 45]].map((p, k) => {
+    const s = scanOf(p, k, L);
+    s.pose = S.relativePose([1, 1, 0], p);
+    return s;
+  });
+  const cells = LC.computeGridCells(refs, (s) => LC.filterScanPoints(s, f), res);
+  const q = LC.filterScanPoints(scanOf([7, 5.2, 90], 2, L), f);
+  const good = LC.freeSpaceConsistency(q, S.relativePose([1, 1, 0], [7, 5.2, 90]), cells, res);
+  const wrong = LC.freeSpaceConsistency(q, [0, 0, 0], cells, res); // bras du L superposé à la zone de départ
+  assert.ok(good.freeHit < 0.05 && good.wallCross < 0.05, JSON.stringify(good));
+  assert.ok(wrong.freeHit > 0.15 || wrong.wallCross > 0.15, JSON.stringify(wrong));
+});
+
+test("A13. sans freeSpaceCheck, locateScanOnGrid ne calcule aucun indicateur de cohérence (comportement inchangé)", () => {
+  const scans = PATH.slice(0, 2).map((p, k) => scanOf(p, k));
+  scans[0].pose = [0, 0, 0];
+  const f = LC.ASSEMBLY_DEFAULTS.filter;
+  const g = LC.cellsToGrid(LC.computeGridCells([scans[0]], (s) => LC.filterScanPoints(s, f), 0.05), 0.05);
+  const r = LC.locateScanOnGrid(LC.filterScanPoints(scans[1], f), g, { minOverlap: 0.35 });
+  assert.strictEqual(r.freeHit, undefined);
+  assert.strictEqual(r.incoherent, undefined);
+  assert.strictEqual(LC.ASSEMBLY_DEFAULTS.freeSpace, null, "désactivé par défaut tant qu'aucun seuil n'est validé");
+});
