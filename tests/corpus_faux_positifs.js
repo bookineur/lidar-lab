@@ -57,9 +57,9 @@ function runCase(name, seed) {
 }
 
 /** Rejoue la décision de locateScanOnGrid (même fonction chooseCandidate) pour un couple de seuils. */
-function outcome(c, maxFreeHit, maxWallCross) {
+function outcome(c, maxFreeHit, maxWallCross, overlapAmbiguity = false) {
   if (!c.cands.length) return "refus";
-  const ch = LC.chooseCandidate(c.cands, { minOverlap: LC.ASSEMBLY_DEFAULTS.minOverlap, maxFreeHit, maxWallCross });
+  const ch = LC.chooseCandidate(c.cands, { minOverlap: LC.ASSEMBLY_DEFAULTS.minOverlap, maxFreeHit, maxWallCross, overlapAmbiguity });
   if (!ch.ok) return "refus";
   if (c.doitRefuser) return "faux_positif";
   const deg = (ch.best.a * 180) / Math.PI;
@@ -67,10 +67,10 @@ function outcome(c, maxFreeHit, maxWallCross) {
   return good ? "bonne_pose" : "faux_positif";
 }
 
-function tally(cases, a, b) {
+function tally(cases, a, b, overlapAmbiguity = false) {
   const t = { bonne_pose: 0, faux_positif: 0, refus: 0, parScenario: {} };
   for (const c of cases) {
-    const o = outcome(c, a, b);
+    const o = outcome(c, a, b, overlapAmbiguity);
     t[o]++;
     const p = (t.parScenario[c.name] = t.parScenario[c.name] || { bonne_pose: 0, faux_positif: 0, refus: 0 });
     p[o]++;
@@ -95,18 +95,20 @@ if (require.main === module) {
   if (mode === "calibrer") {
     const t0 = Date.now();
     const cases = collect(range(1, 100));
-    const sans = tally(cases, Infinity, Infinity);
+    const amb = process.argv.includes("--ambiguite-recouvrement");
+    const sans = tally(cases, Infinity, Infinity, false);
     const rows = [];
-    for (const a of GRID) for (const b of GRID) rows.push({ a, b, ...tally(cases, a, b) });
+    for (const a of GRID) for (const b of GRID) rows.push({ a, b, ...tally(cases, a, b, amb) });
     const zero = rows.filter((r) => r.faux_positif === 0);
     zero.sort((p, q) => q.bonne_pose - p.bonne_pose || (q.a === Infinity ? 1e9 : q.a) + (q.b === Infinity ? 1e9 : q.b) - ((p.a === Infinity ? 1e9 : p.a) + (p.b === Infinity ? 1e9 : p.b)));
     const pick = zero[0] || null;
     const out = {
       corpus: "réglage, graines 1..100",
+      ambiguite_recouvrement: amb,
       cas: cases.length,
       duree_s: (Date.now() - t0) / 1000,
       sans_test: { bonne_pose: sans.bonne_pose, faux_positif: sans.faux_positif, refus: sans.refus, parScenario: sans.parScenario },
-      grille: rows.map((r) => ({ maxFreeHit: fmt(r.a), maxWallCross: fmt(r.b), bonne_pose: r.bonne_pose, faux_positif: r.faux_positif, refus: r.refus })),
+      grille: rows.map((r) => ({ maxFreeHit: fmt(r.a), maxWallCross: fmt(r.b), bonne_pose: r.bonne_pose, faux_positif: r.faux_positif, refus: r.refus, parScenario: r.parScenario })),
       choix: pick ? { maxFreeHit: pick.a, maxWallCross: pick.b, bonne_pose: pick.bonne_pose, faux_positif: 0, refus: pick.refus, parScenario: pick.parScenario } : null,
     };
     console.log(JSON.stringify(out, null, 1));
@@ -115,9 +117,9 @@ if (require.main === module) {
     if (!fs0) throw new Error("aucun seuil dans LC.ASSEMBLY_DEFAULTS.freeSpace : lancer d'abord la calibration");
     const t0 = Date.now();
     const cases = collect(range(101, 200));
-    const avec = tally(cases, fs0.maxFreeHit, fs0.maxWallCross),
-      sans = tally(cases, Infinity, Infinity);
-    console.log(JSON.stringify({ corpus: "évaluation, graines 101..200", cas: cases.length, duree_s: (Date.now() - t0) / 1000, seuils: fs0, avec, sans }, null, 1));
+    const avec = tally(cases, fs0.maxFreeHit, fs0.maxWallCross, !!LC.ASSEMBLY_DEFAULTS.overlapAmbiguity),
+      sans = tally(cases, Infinity, Infinity, false);
+    console.log(JSON.stringify({ corpus: "évaluation, graines 101..200", cas: cases.length, duree_s: (Date.now() - t0) / 1000, seuils: fs0, ambiguite_recouvrement: !!LC.ASSEMBLY_DEFAULTS.overlapAmbiguity, avec, sans }, null, 1));
   }
 }
 

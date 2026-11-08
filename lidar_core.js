@@ -451,13 +451,14 @@
         }
       }
       q.overlap = inliers / finePoints.length;
+      q.n = finePoints.length;
       q.inlierRms = inliers ? Math.sqrt(inlierSq / inliers) : Infinity;
     }
     // options.freeSpaceCheck = {cells, res, maxFreeHit, maxWallCross} : test de cohérence avec l'espace libre
     // (voir freeSpaceConsistency). Sans cette option : choix et résultat inchangés.
     const fsc = options.freeSpaceCheck;
     if (fsc) for (const q of finals) Object.assign(q, freeSpaceConsistency(finePoints, [q.x, q.y, (q.a * 180) / Math.PI], fsc.cells, fsc.res));
-    const choice = chooseCandidate(finals, { minOverlap, maxFreeHit: fsc ? fsc.maxFreeHit : undefined, maxWallCross: fsc ? fsc.maxWallCross : undefined });
+    const choice = chooseCandidate(finals, { minOverlap, maxFreeHit: fsc ? fsc.maxFreeHit : undefined, maxWallCross: fsc ? fsc.maxWallCross : undefined, overlapAmbiguity: !!options.overlapAmbiguity });
     const best = choice.best,
       overlap = best.overlap,
       inlierRms = best.inlierRms,
@@ -470,7 +471,7 @@
     const result = { ok, reason: choice.reason, pose, mean, overlap, inlierRms, gap, ambiguous, quality, minOverlap };
     if (fsc) Object.assign(result, { freeHit: best.freeHit, wallCross: best.wallCross, incoherent: choice.incoherent });
     if (options.debug)
-      result.candidates = finals.map((q) => ({ x: q.x, y: q.y, deg: (q.a * 180) / Math.PI, a: q.a, cost: q.cost, overlap: q.overlap, inlierRms: q.inlierRms, freeHit: q.freeHit, wallCross: q.wallCross }));
+      result.candidates = finals.map((q) => ({ x: q.x, y: q.y, deg: (q.a * 180) / Math.PI, a: q.a, cost: q.cost, overlap: q.overlap, n: q.n, inlierRms: q.inlierRms, freeHit: q.freeHit, wallCross: q.wallCross }));
     return result;
   }
 
@@ -484,11 +485,23 @@
       pool = check ? cands.filter((q) => !(q.freeHit > o.maxFreeHit) && !(q.wallCross > o.maxWallCross)) : cands;
     if (!pool.length) return { best: cands[0], next: null, gap: 0, ambiguous: false, incoherent: true, ok: false, reason: "incoherent" };
     const best = pool[0],
-      next = pool.find((q) => Math.hypot(q.x - best.x, q.y - best.y) > 0.6 || angleDiff(q.a, best.a) > 0.4),
-      gap = next ? Math.max(0, (next.cost - best.cost) / Math.max(next.cost, 1e-9)) : 1,
-      ambiguous = !!next && gap < 0.08,
-      ok = !ambiguous && best.overlap >= o.minOverlap;
-    return { best, next, gap, ambiguous, incoherent: false, ok, reason: ok ? "" : ambiguous ? "ambigu" : "recouvrement" };
+      far = (q) => Math.hypot(q.x - best.x, q.y - best.y) > 0.6 || angleDiff(q.a, best.a) > 0.4,
+      next = pool.find(far),
+      gap = next ? Math.max(0, (next.cost - best.cost) / Math.max(next.cost, 1e-9)) : 1;
+    let ambiguous = !!next && gap < 0.08,
+      rival = null;
+    // o.overlapAmbiguity : ambigu aussi si un rival éloigné recouvre la carte AUTANT que le meilleur, à l'erreur
+    // statistique près : recouvrement >= p - 2·sqrt(p(1-p)/N) (p borné à [0,05 ; 0,95], N points comparés).
+    // Indépendant de l'échelle du coût : deux poses équivalentes d'une salle symétrique ont des coûts minuscules
+    // dont l'écart RELATIF dépasse facilement 8 %, mais des recouvrements égaux.
+    if (o.overlapAmbiguity && Number.isFinite(best.overlap)) {
+      const p = Math.min(0.95, Math.max(0.05, best.overlap)),
+        delta = 2 * Math.sqrt((p * (1 - p)) / Math.max(1, best.n || 1));
+      rival = pool.find((q) => far(q) && q.overlap >= best.overlap - delta) || null;
+      if (rival) ambiguous = true;
+    }
+    const ok = !ambiguous && best.overlap >= o.minOverlap;
+    return { best, next, rival, gap, ambiguous, incoherent: false, ok, reason: ok ? "" : ambiguous ? "ambigu" : "recouvrement" };
   }
 
   // Cellules « confirmées » de la grid map log-odds : au moins deux observations nettes dans le même sens
@@ -569,7 +582,13 @@
     filter: { minRange: 0.05, maxRange: 12, minIntensity: 0 },
     order: "capture", // "capture" : tri par l'heure lue dans le nom ; "fourni" : ordre donné
     // test de cohérence avec l'espace libre (freeSpaceConsistency) : {maxFreeHit, maxWallCross} ou null (désactivé)
+    // Désactivé par défaut. Seuils issus de tests/corpus_faux_positifs.js (graines 1..100) : { maxFreeHit: 0.05,
+    // maxWallCross: Infinity }. Ce test CHANGE le candidat retenu et peut faire gagner une pose fausse : sur la séance
+    // réelle du 04/11, il déplace les scans 7 et 8 de 3,8 m alors que les scans 6 et 9 restent en place (voir
+    // tests/resultats_faux_positifs.md). À n'activer qu'en connaissance de cause.
     freeSpace: null,
+    // ambiguïté aussi jugée sur le recouvrement (voir chooseCandidate) ; false = règle de l'Auto-SLAM seule
+    overlapAmbiguity: true,
   };
 
   /** Localisation et construction automatiques d'une carte à partir de scans enregistrés (scan matching
@@ -640,7 +659,7 @@
       const prev = placed[placed.length - 1].pose;
       const loc = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, around: { pose: prev, xy: o.localXY, deg: o.localDeg } });
       const fsc = o.freeSpace ? { cells, res: o.resolution, maxFreeHit: o.freeSpace.maxFreeHit, maxWallCross: o.freeSpace.maxWallCross } : undefined;
-      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [], freeSpaceCheck: fsc });
+      const r = locateScanOnGrid(it.pts, g, { minOverlap: o.minOverlap, seeds: loc.pose ? [loc.pose] : [], freeSpaceCheck: fsc, overlapAmbiguity: o.overlapAmbiguity });
       const near = (p) => p && Math.hypot(p[0] - prev[0], p[1] - prev[1]) <= o.localXY + 0.05 && Math.abs(((p[2] - prev[2] + 540) % 360) - 180) <= o.localDeg + 1;
       const methode = near(r.pose) ? "locale" : "globale";
       const fields = { recouvrement: r.overlap, ecart: r.gap, rms_cm: Number.isFinite(r.inlierRms) ? r.inlierRms * 100 : null, ambigu: !!r.ambiguous, libre: r.freeHit ?? null, traverse: r.wallCross ?? null };

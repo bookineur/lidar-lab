@@ -90,3 +90,46 @@ Minimum de la grille : 189 faux positifs, contre 251 sans le test.
 | ∞ | ∞ | 204 | 251 | 145 |
 
 Les graines d’évaluation 101 à 200 n’ont pas encore été utilisées.
+
+---
+
+# Étape 3 — ambiguïté jugée aussi sur le recouvrement
+
+## Règle annoncée avant la mesure
+
+Un candidat rival éloigné (> 0,6 m ou > 0,4 rad du meilleur) rend la pose **ambiguë** si son recouvrement est ≥ p − 2·√(p(1−p)/N), avec p le recouvrement du meilleur (borné à [0,05 ; 0,95]) et N le nombre de points comparés : un intervalle à 95 % d’une proportion, sans paramètre réglé. Ce critère s’ajoute à l’ancien (écart de coût relatif < 8 %). Il est actif seulement dans l’assemblage du bouton ; l’Auto-SLAM et le robot sont inchangés.
+
+## Réglage (graines 1–100, 600 cas) avec ce critère
+
+La règle (0 faux positif, puis le plus de bonnes poses, puis le moins strict) désigne **maxFreeHit = 0.05, maxWallCross = ∞** : 220 bonnes poses, **0 faux positif**, 380 refus.
+
+## Évaluation sur les graines 101–200 (jamais utilisées pour le réglage)
+
+| Configuration | Bonnes poses | Faux positifs | Refus | Salle en L (bonnes / FP / refus) |
+|---|---|---|---|---|
+| étape 1 (aucun) | 204 | **255** | 141 | 4 / 63 / 33 |
+| ambiguïté seule | 200 | **48** | 352 | 0 / 47 / 53 |
+| espace libre seul 5 % | 277 | **193** | 130 | 77 / 1 / 22 |
+| les deux | 215 | **2** | 383 | 15 / 1 / 84 |
+
+Le critère de réussite « 0 faux positif » **n’est pas atteint** : 2 faux positifs sur 600 avec les deux tests (1 salle en L, 1 symétrie centrale).
+
+## Jeux de données indépendants
+
+| Jeu | Configuration | Résultat |
+|---|---|---|
+| `repetition_tp2` (simulé, `verite.json`) | étape 1 | 1 bonne pose, **14 faux positifs**, 0 refus |
+| | ambiguïté seule | **15 bonnes poses, 0 faux positif**, 0 refus (erreur médiane 1,2 cm) |
+| | espace libre seul | 13 bonnes, 2 faux positifs |
+| | les deux | 15 bonnes, 0 faux positif |
+| Séance réelle du 04/11 (40 scans, sans vérité terrain) | étape 1 | 40 placés ; écart médian 4,3 cm avec l’Auto-SLAM, mais **9 scans à 90°** |
+| | ambiguïté seule | 37 placés, 3 refusés (38–40) ; **31 des 32 scans comparables à moins de 10 cm** de l’Auto-SLAM ; **0 à 90°** ; scan 28 à 4,1 m (l’Auto-SLAM l’avait accepté avec 53 % de recouvrement) |
+| | les deux | 34 placés ; les scans 7 et 8 sautent de 3,8 m alors que les scans 6 et 9, pris quelques secondes avant et après, restent d’accord avec l’Auto-SLAM : **physiquement impossible** |
+
+## Décision et justification
+
+- **Activé par défaut dans l’assemblage : l’ambiguïté sur le recouvrement** (`overlapAmbiguity: true`). Ce critère ne peut qu’**ajouter des refus**, jamais faire accepter une autre pose (vérifié par le test A14). Il ne peut donc pas créer de faux positif par rapport à l’étape 1.
+- **Désactivé par défaut : le test d’espace libre** (`freeSpace: null`, seuils documentés). Il **change le candidat retenu** : quand la bonne pose est écartée, une fausse peut gagner. Sur la séance réelle, il produit des sauts de 3,8 m. Les défauts réels du LD06 (vitres, personnes, bords) mettent sans doute plus de 5 % des points de la bonne pose dans du « vide », ce que la simulation ne reproduit pas.
+- **Limite restante** : bras étroit d’une salle en L (47 faux positifs sur 100 graines avec l’ambiguïté seule) — test A7b laissé « à faire ».
+
+Mesures du 08/11/2026. Scans simulés sauf la séance réelle du 04/11.

@@ -85,10 +85,9 @@ test("A5. aucun mur commun (graine 13) : le scan est refusé, raison donnée, ja
   assert.strictEqual(b.places, 3);
 });
 
-// LIMITE CONNUE (documentée, non corrigée à l'étape 1) : le critère d'acceptation de locateScanOnGrid
-// (recouvrement >= 35 % et écart relatif >= 8 %, le même que l'Auto-SLAM) accepte parfois une pose FAUSSE
-// quand la géométrie est simple : un petit rectangle d'une autre pièce « tient » dans la salle.
-test("A5b. aucun mur commun, autres graines : ne doit jamais être placé", { todo: "faux positif du critère recouvrement/ambiguïté (graine 99 placée à tort)" }, () => {
+// Étape 1 : le critère de l'Auto-SLAM seul (écart de coût relatif) plaçait parfois ce scan (graine 99).
+// Étape 3 : corrigé par l'ambiguïté jugée aussi sur le recouvrement (overlapAmbiguity, activée dans l'assemblage).
+test("A5b. aucun mur commun, autres graines : ne doit jamais être placé", () => {
   const scans = PATH.slice(0, 3).map((p, k) => scanOf(p, k));
   const other = [...S.rect(30, 30, 33, 32), S.seg(31, 30.5, 31, 31.5)];
   for (const seed of [99, 7, 42]) {
@@ -98,9 +97,9 @@ test("A5b. aucun mur commun, autres graines : ne doit jamais être placé", { to
   }
 });
 
-// LIMITE CONNUE : sur 30 tirages de bruit dans cette salle, le critère d'origine (Auto-SLAM, recherche globale
-// seule) accepte une pose fausse dans 21 cas ; la graine locale de l'assemblage n'en ajoute aucun (mesure du 07/11).
-test("A6. salle parfaitement symétrique (configuration du test 4b) : aucune pose fausse acceptée", { todo: "faux positif préexistant du critère d'ambiguïté : 21 tirages sur 30 acceptent une pose fausse" }, () => {
+// Avec le critère de l'Auto-SLAM seul, 21 tirages de bruit sur 30 acceptaient une pose fausse dans cette salle
+// (mesure du 07/11) ; corrigé à l'étape 3 par l'ambiguïté sur le recouvrement (corpus : 92 -> 0 sur 100 graines).
+test("A6. salle parfaitement symétrique (configuration du test 4b) : aucune pose fausse acceptée", () => {
   const sym = S.rect(0, 0, 6, 4);
   const truth = [[2, 2, 0], [4, 2, 0]];
   const b = LC.assembleSession(truth.map((p, k) => scanOf(p, k, sym)));
@@ -111,7 +110,7 @@ test("A6. salle parfaitement symétrique (configuration du test 4b) : aucune pos
   if (r.statut === "refusé") assert.match(r.raison, /ambigu|murs communs/);
 });
 
-test("A6b. symétrie centrale parfaite (scan 2 retourné de 180°) : doit être refusé", { todo: "faux positif : écart relatif 29 % entre deux poses physiquement équivalentes (coûts très faibles)" }, () => {
+test("A6b. symétrie centrale parfaite (scan 2 retourné de 180°) : doit être refusé", () => {
   const sym = S.rect(0, 0, 6, 4);
   const b = LC.assembleSession([scanOf([1.5, 2, 0], 0, sym), scanOf([4.5, 2, 180], 1, sym)]);
   assert.strictEqual(b.resultats[1].statut, "refusé");
@@ -131,7 +130,7 @@ test("A7. scan refusé puis réessayé : placé dès qu'un scan intermédiaire a
   checkAgainstTruth(b.resultats, { "scan_A_10h00m00.csv": PATH[0], "scan_C_10h01m00.csv": PATH[7], "scan_B_10h02m00.csv": PATH[3] }, 0.06, 1.5);
 });
 
-test("A7b. salle en L : un scan du bras étroit ne doit pas être placé dans la première zone", { todo: "faux positif : bras de 2 m confondu avec la bande de 2 m de départ (recouvrement 68 %, écart 28 %)" }, () => {
+test("A7b. salle en L : un scan du bras étroit ne doit pas être placé dans la première zone", { todo: "faux positif restant : corrigé seulement par le test d'espace libre, désactivé car il déplace des scans réels (voir tests/resultats_faux_positifs.md)" }, () => {
   const L = [S.seg(0, 0, 8, 0), S.seg(8, 0, 8, 6), S.seg(8, 6, 6, 6), S.seg(6, 6, 6, 2), S.seg(6, 2, 0, 2), S.seg(0, 2, 0, 0), ...S.rect(7.2, 4.6, 7.8, 5.2, "poteau"), ...S.rect(2.5, 0.0, 3.0, 0.4, "meuble")];
   const truth = { "scan_01_09h00m00.csv": [1, 1, 0], "scan_02_09h00m10.csv": [7, 5.2, 90], "scan_03_09h00m20.csv": [7, 1, 45] };
   const b = LC.assembleSession(Object.entries(truth).map(([n, p], k) => scanOf(p, k, L, n)));
@@ -183,7 +182,7 @@ test("A10. interface : un scan inutilisable est signalé, masqué et laissé hor
   assert.match(h.$("buildMapTable").innerHTML, /pas assez de points/);
 });
 
-test("A10b. interface : un scan d'une autre pièce (sans mur commun) doit rester hors carte", { todo: "faux positif du critère (voir A5b) : le scan est placé à tort" }, async () => {
+test("A10b. interface : un scan d'une autre pièce (sans mur commun) doit rester hors carte", async () => {
   const h = loadApp("index.html");
   const other = [...S.rect(30, 30, 33, 32), S.seg(31, 30.5, 31, 31.5)];
   await h.loadFiles([
@@ -235,4 +234,23 @@ test("A13. sans freeSpaceCheck, locateScanOnGrid ne calcule aucun indicateur de 
   assert.strictEqual(r.freeHit, undefined);
   assert.strictEqual(r.incoherent, undefined);
   assert.strictEqual(LC.ASSEMBLY_DEFAULTS.freeSpace, null, "désactivé par défaut tant qu'aucun seuil n'est validé");
+});
+
+test("A14. l'ambiguïté par recouvrement ne fait qu'ajouter des refus : jamais une autre pose acceptée", () => {
+  // propriété de sûreté : sur les candidats réels du corpus, une pose acceptée AVEC le critère est la même
+  // que celle acceptée SANS ; le critère ne peut que transformer une acceptation en refus.
+  const C = require("./corpus_faux_positifs.js");
+  for (const name of Object.keys(C.SCENARIOS))
+    for (const seed of [201, 202]) {
+      const c = C.runCase(name, seed);
+      if (!c.cands.length) continue;
+      const o = { minOverlap: LC.ASSEMBLY_DEFAULTS.minOverlap };
+      const without = LC.chooseCandidate(c.cands, { ...o, overlapAmbiguity: false }),
+        withA = LC.chooseCandidate(c.cands, { ...o, overlapAmbiguity: true });
+      if (withA.ok) {
+        assert.ok(without.ok, name + " " + seed);
+        assert.strictEqual(withA.best, without.best, name + " " + seed);
+      }
+    }
+  assert.strictEqual(LC.ASSEMBLY_DEFAULTS.overlapAmbiguity, true);
 });
