@@ -7,8 +7,8 @@
 //       de la largeur du robot ;
 //    2. parmi les directions assez dégagées, on choisit celle qui pointe vers le plus de FRONTIÈRES de la
 //       carte (cellules inconnues voisines d'une cellule libre), les proches comptant plus ;
-//    3. le robot pivote (/turn), avance d'un petit pas (/drive, renvoyé toutes les 250 ms) en surveillant
-//       l'avant à chaque scan (arrêt immédiat sous la distance de sécurité), puis s'arrête ;
+//    3. le robot pivote (/turn) ; robot arrêté, il vérifie que l'avant est dégagé sur la longueur du pas plus la
+//       distance de sécurité, puis avance d'un petit pas (/drive renvoyé toutes les 250 ms) et s'arrête ;
 //    4. capture + recalage (Auto-SLAM existant) : la pose vient du LiDAR, pas d'une odométrie.
 //  Arrêts : plus de frontière accessible, nombre de pas ou durée maximum, 2 recalages refusés de suite
 //  (position perdue), ou demande d'arrêt. Le robot reçoit /stop à la fin, quelle qu'en soit la raison.
@@ -209,7 +209,7 @@ function localPoints(scan, o) {
 }
 
 /** Explorateur. io = {
-      scan(): Promise<{pts}> (scan frais, repère robot),
+      scan(): Promise<{pts}> (scan frais, repère robot ; jamais appelé pendant que le robot roule),
       turn(deg): Promise<number ms>, drive(l, r): Promise, stop(): Promise,
       capture(): Promise<{ok, pose}> (capture + recalage ; pose [x,y,deg] si ok),
       state(): {pose, grid, visited} (dernière pose recalée, carte cumulée, poses visitées),
@@ -223,22 +223,30 @@ function createExplorer(io, options = {}) {
     st.status = m;
   };
 
+  // Après chaque ordre de mouvement : si STOP est arrivé pendant l'envoi, on renvoie /stop (le robot traite
+  // les requêtes une par une : un /turn parti juste avant le STOP ne doit pas être exécuté après lui).
+  async function move(fn) {
+    const r = await fn();
+    if (st.stopRequested) await io.stop();
+    return r;
+  }
+
+  // Un pas : contrôle de l'avant ROBOT À L'ARRÊT, puis /drive renvoyé toutes les 250 ms pendant la durée du pas.
+  // Aucun scan n'est lu PENDANT le pas : le robot ne traite qu'une requête à la fois et un /scan peut mettre 1 à 3 s
+  // par un partage de connexion ; les /drive suivants attendraient derrière lui (à-coups : la sécurité de 0,7 s du
+  // robot l'arrête) et la mesure de l'avant daterait de plusieurs secondes. Le pas est court (≤ 0,35 m, ~1,4 s) et
+  // limité par le dégagement mesuré juste avant (pas ≤ dégagement − sécurité − 0,1 m).
   async function stepForward(dist) {
+    const front = corridorClearance(localPoints(await io.scan(), o), 0, o.halfWidth);
+    if (front < o.safety + dist) return { blocked: true, ms: 0 };
     const t0 = io.now(),
       dur = (dist / o.speedEst) * 1000;
-    let blocked = false;
     while (!st.stopRequested && io.now() - t0 < dur) {
-      const sc = await io.scan();
-      const front = corridorClearance(localPoints(sc, o), 0, o.halfWidth);
-      if (front < o.safety) {
-        blocked = true;
-        break;
-      }
-      await io.drive(o.speed, o.speed); // renvoyé régulièrement : le robot s'arrête seul sans ordre pendant 0,7 s
+      await move(() => io.drive(o.speed, o.speed));
       await io.sleep(250);
     }
     await io.stop();
-    return { blocked, ms: io.now() - t0 };
+    return { blocked: false, ms: io.now() - t0 };
   }
 
   async function run() {
@@ -266,7 +274,7 @@ function createExplorer(io, options = {}) {
         if (!choice) return (reason = "terminé : plus de zone inconnue accessible");
         if (Math.abs(choice.turnDeg) >= 3) {
           log(`Pas ${st.step + 1} : rotation de ${choice.turnDeg}°`);
-          const ms = await io.turn(choice.turnDeg);
+          const ms = await move(() => io.turn(choice.turnDeg));
           await io.sleep((+ms || 0) + 500);
           if (st.stopRequested) return (reason = "arrêt demandé");
         }

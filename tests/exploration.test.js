@@ -85,7 +85,9 @@ test("X3. arrêt demandé : la boucle s'arrête et le robot reçoit /stop", asyn
   assert.strictEqual(sim.st.cmd.r, 0);
 });
 
-test("X4. obstacle apparu devant pendant un pas : arrêt avant la distance de sécurité, sans collision", async () => {
+// Limite assumée : aucun scan n'est lu PENDANT un pas (≤ 0,35 m, ~1,4 s), car le robot ne traite qu'une requête à
+// la fois ; un obstacle qui surgit pendant ces 1,4 s n'est pas vu. Il l'est au contrôle suivant, robot à l'arrêt.
+test("X4. obstacle posé devant le robot entre deux pas : vu au contrôle à l'arrêt, pas de collision", async () => {
   // un carton est posé devant le robot APRÈS son choix de direction (il n'est pas dans la carte)
   const sim = createSimRobot({ walls: TWO, start: [1.5, 1.0, 0], seed: 5 });
   const box = S.rect(1.95, 0.85, 2.15, 1.15, "carton");

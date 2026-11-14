@@ -353,7 +353,7 @@ const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 const explorer = createExplorer({
   now: () => Date.now(),
   sleep: sleep2,
-  scan: async () => LC.parseCsv((await robotScan(0)).text, "exploration"),
+  scan: async () => LC.parseCsv((await robotScan(0)).text, "exploration"), // robot à l'arrêt : scan frais
   turn: async (deg) => ((lastMoveCmd = Date.now()), +(await robotGet("/turn?deg=" + Math.round(deg), 1500)) || 0),
   drive: async (l, r) => ((lastMoveCmd = Date.now()), robotGet(`/drive?l=${Math.round(l)}&r=${Math.round(r)}`, 1200)),
   stop: () => robotGet("/stop", 1200),
