@@ -19,6 +19,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const LC = require("../lidar_core.js");
+const { createExplorer } = require("./exploration.js");
 
 const ROOT = path.join(__dirname, "..");
 function option(name, def) {
@@ -345,6 +346,34 @@ function sessionJson() {
   return { version, name: seance.name, dossier: seance.dir, settings: seance.settings, scans: seance.scans, robot: { url: ROBOT || "recherche…", online: robotOnline } };
 }
 const ROBOT_CMDS = new Set(["drive", "release", "stop", "turn", "config", "lidar"]);
+
+// ---------------- exploration automatique (bonus) ----------------
+// Le module exploration.js décide où aller ; ici on lui fournit les vraies commandes du robot et la séance.
+const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+const explorer = createExplorer({
+  now: () => Date.now(),
+  sleep: sleep2,
+  scan: async () => LC.parseCsv((await robotScan(0)).text, "exploration"),
+  turn: async (deg) => ((lastMoveCmd = Date.now()), +(await robotGet("/turn?deg=" + Math.round(deg), 1500)) || 0),
+  drive: async (l, r) => ((lastMoveCmd = Date.now()), robotGet(`/drive?l=${Math.round(l)}&r=${Math.round(r)}`, 1200)),
+  stop: () => robotGet("/stop", 1200),
+  capture: async () => {
+    while (busy) await sleep2(100);
+    busy = true;
+    try {
+      const r = await capture({ auto: true, keepRejected: true });
+      return { ok: !!r.ok, pose: r.scan && r.scan.pose };
+    } finally {
+      busy = false;
+    }
+  },
+  state: () => {
+    const reg = seance.scans.filter((e) => e.reg);
+    if (!reg.length) return { pose: null, grid: null, visited: [] };
+    const last = [...seance.scans].reverse().find((e) => e.reg);
+    return { pose: last.pose, grid: currentGrid(), visited: reg.map((e) => e.pose) };
+  },
+});
 // Pendant la conduite, on lit le LiDAR moins souvent : le robot ne traite qu'une requête à la fois et un
 // scan (~6 ko) retarde les ordres de déplacement envoyés juste après (latence ressentie au téléphone).
 let lastMoveCmd = 0;
@@ -356,6 +385,19 @@ async function handle(req, res) {
   try {
     // --- relais vers le robot ---
     if (p === "/api/robot/scan") return send(res, 200, (await robotScan(scanMaxAge())).text, "text/csv; charset=utf-8");
+    // exploration : l'arrêt passe TOUJOURS (même pendant une capture) ; le pilotage manuel est refusé pendant l'exploration
+    if (p === "/api/explore/status") return send(res, 200, explorer.status());
+    if (p === "/api/explore/stop" || p === "/api/robot/stop") {
+      if (explorer.status().running) await explorer.stop();
+      if (p === "/api/explore/stop") return send(res, 200, explorer.status());
+    }
+    if (explorer.status().running && (p === "/api/robot/drive" || p === "/api/robot/turn" || p === "/api/capture"))
+      return send(res, 409, { erreur: "exploration automatique en cours : appuie sur STOP pour reprendre la main" });
+    if (p === "/api/explore/start" && req.method === "POST") {
+      if (!robotOnline) return send(res, 409, { erreur: "robot non connecté" });
+      if (!explorer.start()) return send(res, 409, { erreur: "exploration déjà en cours" });
+      return send(res, 200, explorer.status());
+    }
     if (p.startsWith("/api/robot/")) {
       const cmd = p.slice(11);
       if (!ROBOT_CMDS.has(cmd)) return send(res, 404, { erreur: "commande inconnue" });

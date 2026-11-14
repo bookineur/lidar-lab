@@ -53,6 +53,10 @@
 <label class="sub" style="display:block;margin-top:8px"><input type="checkbox" id="rwAuto" checked> Auto-SLAM : après chaque arrêt, prendre un scan et l’ajouter si le recalage est fiable</label>
 <label class="sub" style="display:block;margin-top:6px"><input type="checkbox" id="rwKeepRejected" checked> Garder les scans refusés en attente de recalage automatique</label>
 <div class="actions"><button type="button" class="primary" id="rwCapture">Capturer et ajouter à la carte</button><button type="button" id="rwUndo">Annuler le dernier scan</button><button type="button" id="rwRelocate">Recalculer les poses</button><button type="button" id="rwNew">Nouvelle séance</button></div>
+<div class="card" style="padding:10px;margin:10px 0 0;border-color:#c49a3b"><strong>Exploration automatique (bonus)</strong>
+<div class="sub">Le robot choisit seul où aller : il vise la zone encore inconnue la plus proche, pivote, avance d’un petit pas (arrêt si un obstacle est à moins de 35 cm devant), s’arrête, capture et recale, puis recommence. Il s’arrête quand tout est cartographié, après 60 pas ou 15 min, ou si deux recalages de suite sont refusés. <b>Reste à côté du robot</b> : STOP (ou Espace) arrête tout immédiatement.</div>
+<div class="actions"><button type="button" class="primary" id="rwExplore">Explorer automatiquement</button><button type="button" id="rwExploreStop" style="background:#8b2430;border-color:#c43b4a;font-weight:700">Arrêter l’exploration</button></div>
+<div class="sub" id="rwExploreStatus">À l’arrêt.</div></div>
 <div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus. En Auto-SLAM, chaque arrêt après déplacement lance une capture et un recalage; les poses incertaines restent hors de la carte.</div>
 <div class="sub" id="rwPhone" style="margin-top:6px"></div>`;
     // Lidar Lab sur téléphone : la colonne unique ne doit pas être plus large que l'écran,
@@ -311,6 +315,36 @@
     q("rwRelocate").onclick = () => act(async () => (await sync(await post("/api/relocate")), msg("Poses recalculées sur le PC.")), "Recalcul de toutes les poses…");
     q("rwNew").onclick = () => {
       if (confirm("Commencer une nouvelle séance ? L’ancienne reste enregistrée sur le disque.")) act(async () => (await sync(await post("/api/new")), msg("Nouvelle séance créée.")));
+    };
+    // --- exploration automatique ---
+    let explorePoll = null;
+    const showExplore = (st) => {
+      q("rwExploreStatus").textContent = (st.running ? "En cours · pas " + st.step + " · " : "") + (st.status || "À l’arrêt.");
+      q("rwExplore").disabled = !!st.running;
+    };
+    async function pollExplore() {
+      try {
+        const st = JSON.parse(await get("/api/explore/status", 3000));
+        showExplore(st);
+        await sync(JSON.parse(await get("/api/session", 4000)));
+        if (!st.running && explorePoll) clearInterval(explorePoll), (explorePoll = null);
+      } catch {}
+    }
+    q("rwExplore").onclick = async () => {
+      if (!confirm("Lancer l’exploration automatique ? Reste à côté du robot, zone dégagée, STOP à portée de main.")) return;
+      try {
+        showExplore(await post("/api/explore/start"));
+        if (!explorePoll) explorePoll = setInterval(pollExplore, 1500);
+      } catch (e) {
+        q("rwExploreStatus").textContent = "Impossible de lancer : " + e.message;
+      }
+    };
+    q("rwExploreStop").onclick = async () => {
+      try {
+        showExplore(await post("/api/explore/stop"));
+      } catch (e) {
+        q("rwExploreStatus").textContent = "Arrêt : " + e.message;
+      }
     };
     void status;
   }
