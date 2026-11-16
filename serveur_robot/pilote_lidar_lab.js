@@ -54,7 +54,8 @@
 <label class="sub" style="display:block;margin-top:6px"><input type="checkbox" id="rwKeepRejected" checked> Garder les scans refusés en attente de recalage automatique</label>
 <div class="actions"><button type="button" class="primary" id="rwCapture">Capturer et ajouter à la carte</button><button type="button" id="rwUndo">Annuler le dernier scan</button><button type="button" id="rwRelocate">Recalculer les poses</button><button type="button" id="rwNew">Nouvelle séance</button></div>
 <div class="card" style="padding:10px;margin:10px 0 0;border-color:#c49a3b"><strong>Exploration automatique (bonus)</strong>
-<div class="sub">Le robot choisit seul où aller : il vise la zone encore inconnue la plus proche, pivote, avance d’un petit pas (arrêt si un obstacle est à moins de 35 cm devant), s’arrête, capture et recale, puis recommence. Il s’arrête quand tout est cartographié, après 60 pas ou 15 min, ou si deux recalages de suite sont refusés. <b>Reste à côté du robot</b> : STOP (ou Espace) arrête tout immédiatement.</div>
+<div class="sub">Le robot choisit seul où aller : il vise la zone encore inconnue la plus proche, pivote, avance d’un petit pas (arrêt si un obstacle est à moins de 35 cm devant), s’arrête, capture et recale, puis recommence. Il s’arrête quand tout est cartographié, après le nombre de pas choisi (60 au plus) ou 15 min, ou si deux recalages de suite sont refusés. <b>Reste à côté du robot</b> : STOP (ou Espace) arrête tout immédiatement.</div>
+<div class="row"><label>Pas maximum</label><input type="number" id="rwExploreSteps" min="1" max="60" value="3" style="width:70px"><label style="margin-left:12px">Vitesse estimée (m/s)</label><input type="number" id="rwExploreSpeed" min="0.1" max="0.6" step="0.01" value="0.25" style="width:80px"></div>
 <div class="actions"><button type="button" class="primary" id="rwExplore">Explorer automatiquement</button><button type="button" id="rwExploreStop" style="background:#8b2430;border-color:#c43b4a;font-weight:700">Arrêter l’exploration</button></div>
 <div class="sub" id="rwExploreStatus">À l’arrêt.</div></div>
 <div class="sub" id="rwMsg" style="margin-top:8px">Les scans pris ici ou depuis le téléphone (version reliée au PC) sont enregistrés dans le dossier ci-dessus. En Auto-SLAM, chaque arrêt après déplacement lance une capture et un recalage; les poses incertaines restent hors de la carte.</div>
@@ -319,7 +320,8 @@
     // --- exploration automatique ---
     let explorePoll = null;
     const showExplore = (st) => {
-      q("rwExploreStatus").textContent = (st.running ? "En cours · pas " + st.step + " · " : "") + (st.status || "À l’arrêt.");
+      const m = (st.moves || []).map((v) => "pas " + v.pas + " : " + Math.round(v.mesure * 100) + " cm mesurés / " + Math.round(v.vise * 100) + " visés").join(" · ");
+      q("rwExploreStatus").textContent = (st.running ? "En cours · pas " + st.step + (st.maxSteps ? " / " + st.maxSteps : "") + " · " : "") + (st.status || "À l’arrêt.") + (m ? " — " + m : "");
       q("rwExplore").disabled = !!st.running;
     };
     async function pollExplore() {
@@ -333,7 +335,7 @@
     q("rwExplore").onclick = async () => {
       if (!confirm("Lancer l’exploration automatique ? Reste à côté du robot, zone dégagée, STOP à portée de main.")) return;
       try {
-        showExplore(await post("/api/explore/start"));
+        showExplore(await post("/api/explore/start", { maxSteps: +q("rwExploreSteps").value, speedEst: +q("rwExploreSpeed").value }));
         if (!explorePoll) explorePoll = setInterval(pollExplore, 1500);
       } catch (e) {
         q("rwExploreStatus").textContent = "Impossible de lancer : " + e.message;

@@ -118,6 +118,27 @@ test("X5. deux recalages refusés de suite : arrêt « position perdue », robot
   assert.strictEqual(sim.st.cmd.l, 0);
 });
 
+test("X7. essai court : arrêt après le nombre de pas choisi, déplacement mesuré par le recalage", async () => {
+  const sim = createSimRobot({ walls: TWO, start: [1.5, 2, 0], seed: 11 });
+  const ex = E.createExplorer(sim.io);
+  ex.start({ maxSteps: 3 });
+  await ex.wait();
+  const s = ex.status();
+  assert.match(s.status, /terminé : 3 pas/);
+  assert.strictEqual(s.step, 3);
+  assert.strictEqual(sim.st.collided, false);
+  assert.ok(s.moves.length >= 1, "au moins un pas mesuré");
+  for (const m of s.moves) {
+    // robot simulé : 0,0075 m/s par % à 35 % = 0,26 m/s (±10 %) pour 0,25 estimé -> mesure ≈ visé à ±25 %
+    assert.ok(m.mesure > 0.75 * m.vise && m.mesure < 1.25 * m.vise, JSON.stringify(m));
+  }
+  // un nouveau lancement sans réglage reprend les valeurs par défaut
+  const ex2 = E.createExplorer(sim.io, { maxSteps: 1 });
+  ex2.start();
+  await ex2.wait();
+  assert.strictEqual(ex2.status().maxSteps, 1);
+});
+
 // ---------------------------------------------------------------- intégration avec le VRAI serveur
 const http = require("http");
 const fs = require("fs");
@@ -163,7 +184,7 @@ function httpSimRobot(walls, start) {
   });
   return new Promise((r) => srv.listen(0, "127.0.0.1", () => r({ sim, log, port: srv.address().port, close: () => (clearInterval(timer), srv.close()) })));
 }
-const req = (port, p, method = "GET") =>
+const req = (port, p, method = "GET", body = "{}") =>
   new Promise((resolve, reject) => {
     const r = http.request({ host: "127.0.0.1", port, path: p, method, headers: { "content-type": "application/json" } }, (res) => {
       let b = "";
@@ -171,7 +192,7 @@ const req = (port, p, method = "GET") =>
       res.on("end", () => resolve({ code: res.statusCode, body: b }));
     });
     r.on("error", reject);
-    r.end(method === "POST" ? "{}" : undefined);
+    r.end(method === "POST" ? body : undefined);
   });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -212,4 +233,32 @@ test("X6. vrai serveur + faux robot : l'exploration avance, refuse le pilotage m
   assert.ok(sess.scans.filter((s) => s.reg).length >= 4, "origine + 3 pas recalés");
   // après l'arrêt, le pilotage manuel est de nouveau accepté
   assert.equal((await req(port, "/api/robot/drive?l=10&r=10")).code, 200);
+});
+
+test("X8. vrai serveur + faux robot : réglages d'essai bornés (pas maximum, vitesse estimée)", async (t) => {
+  const robot = await httpSimRobot(TWO, [1.5, 2, 0]),
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "explo_")),
+    port = 19000 + Math.floor(Math.random() * 900);
+  const srv = spawn(process.execPath, [path.join(__dirname, "..", "serveur_robot", "serveur.js"), "--robot", "http://127.0.0.1:" + robot.port, "--port", String(port), "--dossier", dir], { stdio: "pipe" });
+  t.after(() => (srv.kill(), robot.close()));
+  for (let i = 0; i < 60; i++) {
+    try {
+      if ((await req(port, "/api/status")).code === 200) break;
+    } catch {}
+    await wait(100);
+  }
+  await req(port, "/api/robot/scan");
+  const start = await req(port, "/api/explore/start", "POST", JSON.stringify({ maxSteps: 2, speedEst: 5 }));
+  assert.equal(start.code, 200, start.body);
+  let st = JSON.parse(start.body);
+  assert.equal(st.maxSteps, 2);
+  assert.equal(st.speedEst, 0.6); // borné à 0,6 m/s
+  await req(port, "/api/robot/stop"); // on ne roule pas à 0,6 m/s estimés : arrêt immédiat
+  for (let i = 0; i < 50 && JSON.parse((await req(port, "/api/explore/status")).body).running; i++) await wait(100);
+  const st2 = JSON.parse((await req(port, "/api/explore/start", "POST", JSON.stringify({ maxSteps: 2, speedEst: "abc" }))).body);
+  assert.equal(st2.speedEst, 0.25); // valeur invalide : valeur par défaut
+  for (let i = 0; i < 400 && JSON.parse((await req(port, "/api/explore/status")).body).running; i++) await wait(200);
+  st = JSON.parse((await req(port, "/api/explore/status")).body);
+  assert.match(st.status, /terminé : 2 pas|position perdue|plus de zone/);
+  assert.equal(robot.sim.st.collided, false);
 });

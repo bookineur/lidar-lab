@@ -395,7 +395,12 @@ async function handle(req, res) {
       return send(res, 409, { erreur: "exploration automatique en cours : appuie sur STOP pour reprendre la main" });
     if (p === "/api/explore/start" && req.method === "POST") {
       if (!robotOnline) return send(res, 409, { erreur: "robot non connecté" });
-      if (!explorer.start()) return send(res, 409, { erreur: "exploration déjà en cours" });
+      // réglages d'essai, bornés : nombre de pas (1 à 60) et vitesse estimée du robot (0,1 à 0,6 m/s)
+      const b = await readBody(req),
+        reglages = {};
+      if (Number.isFinite(+b.maxSteps) && b.maxSteps !== "" && b.maxSteps != null) reglages.maxSteps = Math.max(1, Math.min(60, Math.round(+b.maxSteps)));
+      if (Number.isFinite(+b.speedEst) && b.speedEst !== "" && b.speedEst != null) reglages.speedEst = Math.max(0.1, Math.min(0.6, +b.speedEst));
+      if (!explorer.start(reglages)) return send(res, 409, { erreur: "exploration déjà en cours" });
       return send(res, 200, explorer.status());
     }
     if (p.startsWith("/api/robot/")) {

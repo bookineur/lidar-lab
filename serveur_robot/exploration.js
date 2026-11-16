@@ -215,8 +215,10 @@ function localPoints(scan, o) {
       state(): {pose, grid, visited} (dernière pose recalée, carte cumulée, poses visitées),
       sleep(ms), now() }  */
 function createExplorer(io, options = {}) {
-  const o = { ...DEFAULTS, ...options };
-  const st = { running: false, stopRequested: false, step: 0, refused: 0, status: "à l’arrêt", log: [], lastChoice: null, startedAt: 0 };
+  const base = { ...DEFAULTS, ...options };
+  let o = base; // réglages de l'exploration en cours (start(réglages) peut en changer quelques-uns pour un essai)
+  // moves : pour chaque pas, distance visée et distance mesurée par le recalage lidar (étalonnage de speedEst)
+  const st = { running: false, stopRequested: false, step: 0, refused: 0, status: "à l’arrêt", log: [], lastChoice: null, startedAt: 0, moves: [] };
   const log = (m) => {
     st.log.push(m);
     if (st.log.length > 200) st.log.shift();
@@ -243,7 +245,7 @@ function createExplorer(io, options = {}) {
       dur = (dist / o.speedEst) * 1000;
     while (!st.stopRequested && io.now() - t0 < dur) {
       await move(() => io.drive(o.speed, o.speed));
-      await io.sleep(250);
+      await io.sleep(Math.max(1, Math.min(250, dur - (io.now() - t0)))); // la dernière attente ne dépasse pas la durée du pas
     }
     await io.stop();
     return { blocked: false, ms: io.now() - t0 };
@@ -254,6 +256,7 @@ function createExplorer(io, options = {}) {
     st.stopRequested = false;
     st.step = 0;
     st.refused = 0;
+    st.moves = [];
     st.startedAt = io.now();
     let reason = "";
     try {
@@ -279,6 +282,7 @@ function createExplorer(io, options = {}) {
           if (st.stopRequested) return (reason = "arrêt demandé");
         }
         log(`Pas ${st.step + 1} : avance de ${(choice.step * 100).toFixed(0)} cm (libre ${choice.clearance.toFixed(2)} m)`);
+        const before = io.state().pose;
         const mv = await stepForward(choice.step);
         if (st.stopRequested) return (reason = "arrêt demandé");
         await io.sleep(300);
@@ -287,6 +291,12 @@ function createExplorer(io, options = {}) {
         if (r.ok) {
           st.refused = 0;
           log(`Pas ${st.step} : recalé en ${r.pose.map((v) => v.toFixed(2)).join(", ")}${mv.blocked ? " (arrêté par un obstacle)" : ""}`);
+          if (before && !mv.blocked) {
+            // la rotation se fait sur place : le déplacement entre les deux poses recalées est celui du pas
+            const mesure = Math.hypot(r.pose[0] - before[0], r.pose[1] - before[1]);
+            st.moves.push({ pas: st.step, vise: +choice.step.toFixed(3), mesure: +mesure.toFixed(3), duree_ms: Math.round(mv.ms), speedEst: o.speedEst });
+            log(`Pas ${st.step} : déplacement mesuré par le lidar ${(mesure * 100).toFixed(0)} cm (visé ${(choice.step * 100).toFixed(0)} cm)`);
+          }
         } else {
           st.refused++;
           log(`Pas ${st.step} : recalage refusé (${st.refused}/${o.maxRefused})`);
@@ -305,8 +315,9 @@ function createExplorer(io, options = {}) {
   }
 
   return {
-    start() {
+    start(reglages = {}) {
       if (st.running) return false;
+      o = { ...base, ...reglages };
       st.promise = run();
       return true;
     },
@@ -314,7 +325,7 @@ function createExplorer(io, options = {}) {
       st.stopRequested = true;
       return io.stop().catch(() => {});
     },
-    status: () => ({ running: st.running, step: st.step, refused: st.refused, status: st.status, lastChoice: st.lastChoice, log: st.log.slice(-20) }),
+    status: () => ({ running: st.running, step: st.step, refused: st.refused, status: st.status, lastChoice: st.lastChoice, log: st.log.slice(-20), maxSteps: o.maxSteps, speedEst: o.speedEst, moves: st.moves.slice(-60) }),
     wait: () => st.promise,
   };
 }
