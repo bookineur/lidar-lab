@@ -36,6 +36,10 @@ const DEFAULTS = {
   maxRefused: 2,
   rangeMin: 0.1,
   rangeMax: 8,
+  // Le lidar voit une partie du robot (séance réelle du 10/11 : 270 points entre 7,5 et 16,3 cm, tous entre
+  // 300° et 340°, avant droit). Ces points sont ignorés par l'explorateur seulement ; tout autre point proche
+  // reste un obstacle. null = aucun masque. À revérifier si le lidar ou le robot change.
+  selfMask: { maxRange: 0.2, fromDeg: 300, toDeg: 340 },
 };
 
 const rad = (d) => (d * Math.PI) / 180;
@@ -204,8 +208,13 @@ function chooseDirection(points, pose, grid, visited, options = {}) {
 }
 
 /** Points cartésiens d'un scan (lidar_core.parseCsv) filtrés en portée. */
+function isSelfPoint(p, m) {
+  if (!m || p.r >= m.maxRange) return false;
+  const a = ((((Math.atan2(p.y, p.x) * 180) / Math.PI) % 360) + 360) % 360;
+  return m.fromDeg <= m.toDeg ? a >= m.fromDeg && a < m.toDeg : a >= m.fromDeg || a < m.toDeg;
+}
 function localPoints(scan, o) {
-  return (scan.pts || []).filter((p) => p.r >= o.rangeMin && p.r <= o.rangeMax);
+  return (scan.pts || []).filter((p) => p.r >= o.rangeMin && p.r <= o.rangeMax && !isSelfPoint(p, o.selfMask));
 }
 
 /** Explorateur. io = {
@@ -330,4 +339,4 @@ function createExplorer(io, options = {}) {
   };
 }
 
-module.exports = { DEFAULTS, corridorClearance, frontierCells, planToFrontier, chooseDirection, createExplorer };
+module.exports = { DEFAULTS, localPoints, isSelfPoint, corridorClearance, frontierCells, planToFrontier, chooseDirection, createExplorer };

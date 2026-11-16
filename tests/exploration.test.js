@@ -139,6 +139,27 @@ test("X7. essai court : arrêt après le nombre de pas choisi, déplacement mesu
   assert.strictEqual(ex2.status().maxSteps, 1);
 });
 
+test("X9. points du robot lui-même ignorés (secteur 300–340°, < 20 cm) ; tout autre point proche bloque toujours", () => {
+  const P = (deg, r) => ({ x: r * Math.cos((deg * Math.PI) / 180), y: r * Math.sin((deg * Math.PI) / 180), r });
+  const wall = [];
+  for (let a = 0; a < 360; a += 2) wall.push(P(a, 3)); // salle ronde de 3 m
+  const o = E.DEFAULTS;
+  // le robot vu à 11 cm à l'avant droit : ignoré, la voie est libre jusqu'au mur
+  const self = E.localPoints({ pts: [...wall, P(320, 0.11), P(330, 0.12)] }, o);
+  assert.ok(E.corridorClearance(self, 0, o.halfWidth) > 2.9);
+  assert.ok(E.corridorClearance(self, -40, o.halfWidth) > 2.9);
+  // même distance mais HORS du secteur (devant à gauche) : obstacle, les directions de ce côté sont bloquées
+  const obst = E.localPoints({ pts: [...wall, P(20, 0.12)] }, o);
+  assert.ok(E.corridorClearance(obst, 0, o.halfWidth) < 0.15);
+  assert.ok(E.corridorClearance(obst, 60, o.halfWidth) < 0.15);
+  // dans le secteur mais à plus de 20 cm : obstacle
+  const far = E.localPoints({ pts: [...wall, P(320, 0.3)] }, o);
+  assert.ok(E.corridorClearance(far, -40, o.halfWidth) < 0.31);
+  // masque désactivé : le point du robot bloque de nouveau
+  const off = E.localPoints({ pts: [...wall, P(320, 0.11)] }, { ...o, selfMask: null });
+  assert.ok(E.corridorClearance(off, 0, o.halfWidth) < 0.15);
+});
+
 // ---------------------------------------------------------------- intégration avec le VRAI serveur
 const http = require("http");
 const fs = require("fs");
