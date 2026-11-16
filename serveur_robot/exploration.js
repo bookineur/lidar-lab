@@ -154,7 +154,8 @@ function planToFrontier(grid, pose, o) {
 function chooseDirection(points, pose, grid, visited, options = {}) {
   const o = { ...DEFAULTS, ...options };
   const sectors = [];
-  let best = null;
+  let best = null,
+    pathDeg = 0;
   // 1) chemin vers la frontière atteignable la plus proche ; on vise le premier point du chemin
   const plan = planToFrontier(grid, pose, o);
   if (plan) {
@@ -164,6 +165,7 @@ function chooseDirection(points, pose, grid, visited, options = {}) {
       deg = wrapDeg((Math.atan2(dy, dx) * 180) / Math.PI - pose[2]),
       clearance = corridorClearance(points, deg, o.halfWidth),
       step = Math.max(0, Math.min(o.step, dist, clearance - o.safety - 0.1));
+    pathDeg = deg;
     if (step >= 0.1) return { turnDeg: Math.round(deg), clearance, step, score: plan.length, mode: "chemin", sectors };
     // direction du chemin bouchée de près (angle de mur…) : direction dégagée la plus proche de celle du chemin
     let around = null;
@@ -204,7 +206,17 @@ function chooseDirection(points, pose, grid, visited, options = {}) {
       best = { turnDeg: deg, clearance, step: Math.max(0, Math.min(o.step, clearance - o.safety - 0.1)), score, mode: "direction" };
   }
   if (!plan) return null; // plus aucune frontière atteignable : exploration terminée
-  return best ? { ...best, sectors } : null;
+  if (best) return { ...best, sectors };
+  // 3) demi-tour : le chemin existe mais sa direction est bouchée et les directions libres sont à plus de 120°
+  //    (robot dans un recoin, sortie derrière lui) : direction dégagée la plus proche de celle du chemin.
+  let back = null;
+  for (const sec of sectors) {
+    if (!sec.ok) continue;
+    const diff = Math.abs(wrapDeg(sec.deg - pathDeg));
+    if (!back || diff < back.diff) back = { diff, deg: sec.deg, clearance: sec.clearance };
+  }
+  if (back) return { turnDeg: back.deg, clearance: back.clearance, step: Math.max(0.1, Math.min(o.step, back.clearance - o.safety - 0.1)), score: plan.length, mode: "demi-tour", sectors };
+  return { blocked: true, sectors }; // zone inconnue restante, mais aucune direction libre autour du robot
 }
 
 /** Points cartésiens d'un scan (lidar_core.parseCsv) filtrés en portée. */
@@ -284,6 +296,7 @@ function createExplorer(io, options = {}) {
         const choice = chooseDirection(localPoints(sc, o), pose, grid, visited, o);
         st.lastChoice = choice && { turnDeg: choice.turnDeg, clearance: choice.clearance, score: choice.score };
         if (!choice) return (reason = "terminé : plus de zone inconnue accessible");
+        if (choice.blocked) return (reason = "arrêt : aucune direction libre autour du robot (zone inconnue restante)");
         if (Math.abs(choice.turnDeg) >= 3) {
           log(`Pas ${st.step + 1} : rotation de ${choice.turnDeg}°`);
           const ms = await move(() => io.turn(choice.turnDeg));

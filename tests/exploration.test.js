@@ -160,6 +160,30 @@ test("X9. points du robot lui-même ignorés (secteur 300–340°, < 20 cm) ; to
   assert.ok(E.corridorClearance(off, 0, o.halfWidth) < 0.15);
 });
 
+test("X10. recoin : chemin bouché, sortie derrière -> demi-tour ; entouré de tous côtés -> arrêt « aucune direction libre »", () => {
+  // grille 3 x 3 m libre, moitié gauche (x < 1 m) inconnue : la frontière est DERRIÈRE le robot (cap 0°, en x = 1,5 m)
+  const res = 0.05, W = 60, H = 60, rows = [];
+  // bord irrégulier (une cellule sur deux inconnue en x = 1,0 m) : une frontière doit toucher 2 cellules inconnues
+  for (let r = 0; r < H; r++) rows.push(Array.from({ length: W }, (_, c) => ((c + 0.5) * res < 1.0 || (c === 20 && r % 2 === 0) ? -1 : 0)));
+  const grid = { rows, width: W, height: H, resolution: res, origin: [0, 0] };
+  const P = (deg, r) => ({ x: r * Math.cos((deg * Math.PI) / 180), y: r * Math.sin((deg * Math.PI) / 180), r });
+  const o = E.DEFAULTS;
+  // obstacles à 30 cm partout sauf devant (±60°, ouverture plus large que le robot), libre devant jusqu'à 3 m
+  const pts = [];
+  for (let a = 0; a < 360; a += 2) pts.push(Math.abs(((a + 180) % 360) - 180) <= 60 ? P(a, 3) : P(a, 0.3));
+  const ch = E.chooseDirection(pts, [1.5, 1.5, 0], grid, [[1.5, 1.5, 0]], o);
+  assert.ok(ch && !ch.blocked, "une direction doit être proposée");
+  assert.strictEqual(ch.mode, "demi-tour");
+  assert.strictEqual(ch.turnDeg, 0); // la seule sortie
+  assert.ok(ch.step >= 0.1 && ch.step <= 0.35);
+  assert.ok(E.corridorClearance(pts, ch.turnDeg, o.halfWidth) >= o.safety + ch.step, "le contrôle d'avant-pas doit passer");
+  // entouré à 30 cm de tous côtés : arrêt explicite, pas « plus de zone inconnue »
+  const closed = [];
+  for (let a = 0; a < 360; a += 2) closed.push(P(a, 0.3));
+  const ch2 = E.chooseDirection(closed, [1.5, 1.5, 0], grid, [[1.5, 1.5, 0]], o);
+  assert.ok(ch2 && ch2.blocked);
+});
+
 // ---------------------------------------------------------------- intégration avec le VRAI serveur
 const http = require("http");
 const fs = require("fs");
