@@ -12,7 +12,7 @@ La phase prépare des preuves avant toute correction de l'algorithme. Elle ne va
 
 ### État Git observé
 
-HEAD au moment de l'audit : `976dc55cd3ca16de8ec63049ba31e46b4a935756`, daté du 8 novembre 2026 à 20:34:48 +01:00. Le commit indique Miguel Korgo comme auteur et committer.
+HEAD au moment de l'audit : `e34e3d76518b2e7ea965e7e306321b58f850dcfe`, daté du 8 novembre 2026 à 20:34:48 +01:00. Le commit indique Miguel Korgo comme auteur et committer.
 
 Fichiers modifiés non commités observés :
 
@@ -22,7 +22,7 @@ Fichiers modifiés non commités observés :
 | `tests/assemblage_hors_ligne.test.js` | Retire le marqueur TODO d'A7b; ajoute l'explication du seuil; étend A14 pour vérifier que les filtres n'acceptent pas un autre candidat; vérifie la valeur par défaut de 0,142. | Couvrir le nouveau refus et sa propriété de sûreté. | Non attribuable avec certitude. |
 | `tests/corpus_faux_positifs.js` | Propage le seuil de contradiction dans la fonction d'évaluation du corpus. | Comparer ce veto aux scénarios synthétiques. | Non attribuable avec certitude. |
 
-Fichiers non suivis liés au même état de travail : copies suffixées `976dc55` dans `anciennes_versions/`, rapport `resultats_faux_positifs_976dc55.md`, trois rapports de phases antérieures et `version_2/`. Ils sont restés intacts. Les horodatages des trois fichiers sources sont postérieurs au commit et ceux des copies sont proches des premières modifications; ce sont des indices de séquence, pas une preuve d'auteur. Git ne fournit donc pas de réponse fiable à « qui a écrit les changements non commités ». Le commit antérieur ne permet pas de leur attribuer automatiquement son auteur ou son co-auteur.
+Fichiers non suivis liés au même état de travail : copies suffixées `e34e3d7` dans `anciennes_versions/`, rapport `resultats_faux_positifs_976dc55.md`, trois rapports de phases antérieures et `version_2/`. Ils sont restés intacts. Les horodatages des trois fichiers sources sont postérieurs au commit et ceux des copies sont proches des premières modifications; ce sont des indices de séquence, pas une preuve d'auteur. Git ne fournit donc pas de réponse fiable à « qui a écrit les changements non commités ». Le commit antérieur ne permet pas de leur attribuer automatiquement son auteur ou son co-auteur.
 
 ### Risque particulier de la proposition actuelle
 

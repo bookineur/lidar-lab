@@ -2,7 +2,7 @@
 
 **Date :** 8 novembre 2026  
 **Mode :** inspection et calculs en mémoire. Aucun code, scan, configuration ou historique Git n’a été modifié par cet audit. Seul ce rapport est créé.  
-**Référence :** commit 7e3ccf3. Dans cette version, les options expérimentales espace libre et ambiguïté par overlap sont désactivées par défaut.
+**Référence :** commit 8c8c18a. Dans cette version, les options expérimentales espace libre et ambiguïté par overlap sont désactivées par défaut.
 
 > Pendant l’audit, un diff non commité est apparu dans lidar_core.js et tests/corpus_faux_positifs.js, avec des copies d’archives non suivies. Je ne l’ai ni créé ni modifié. Il ajoute notamment une option overlapAmbiguity, désactivée par défaut. Les résultats ci-dessous concernent les réglages par défaut.
 

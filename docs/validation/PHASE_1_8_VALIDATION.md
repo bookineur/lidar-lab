@@ -1,7 +1,7 @@
 # PHASE 1.8 — VALIDATION EXPÉRIMENTALE DE LA LOCALISATION
 
 **Date :** 8 novembre 2026  
-**Algorithme évalué :** commit c62a2544b717e9e536e74ecfdd099146f4b2e47a (Étape 4, refus de contradiction activé), sans modification durant cette validation.  
+**Algorithme évalué :** commit a9540b4df8d1a3564d9509c60aa2e933d31379e7 (Étape 4, refus de contradiction activé), sans modification durant cette validation.  
 **Données modifiées :** aucune. Seul ce rapport de résultats est créé.  
 **Conclusion courte :** bon résultat sur la trajectoire synthétique nominale; taux de refus élevé dans les cas de géométrie dégénérée. Ces expériences ne suffisent pas à déclarer la localisation fiable pour le robot ou la fusion automatique.
 

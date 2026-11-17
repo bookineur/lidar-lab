@@ -2,7 +2,7 @@
 
 **Date :** 7 novembre 2026  
 **Mode :** audit en lecture seule. Aucun code, scan, réglage, commit ou historique Git n’a été modifié. Ce fichier est le seul artefact créé à cette étape.  
-**Commit du code examiné :** `537bc0a` — `Bouton « Localiser et construire la carte » : assemblage automatique de scans enregistrés`.
+**Commit du code examiné :** `1b0fd69` — `Bouton « Localiser et construire la carte » : assemblage automatique de scans enregistrés`.
 
 ## Recommandation finale : PAS ENCORE PRÊT
 
@@ -34,7 +34,7 @@ node --test --test-name-pattern='A9\.' tests/assemblage_hors_ligne.test.js
 
 Résultat terminal vérifié : **1 test, 1 réussi, 0 échec, 0 ignoré**, durée du test 48 724 ms (durée totale 49 779,99 ms). A9 passe donc dans le commit actuel.
 
-Lors de l’audit précédent, un lancement plus large avait affiché A9 en échec dans un arbre de travail antérieur, mais avait été interrompu avant le rapport d’erreur final. Entre-temps, l’implémentation a été enregistrée dans le commit `537bc0a`. Le diagnostic d’assertion de cet ancien échec n’est pas disponible; **sa cause historique exacte ne peut pas être déterminée** sans le résultat complet ou le snapshot exact de cet ancien état. Le succès isolé d’aujourd’hui montre que l’échec ne se reproduit pas sur le code courant, mais ne permet pas d’affirmer quel changement l’a corrigé. La suite complète n’a pas été exécutée dans cette phase.
+Lors de l’audit précédent, un lancement plus large avait affiché A9 en échec dans un arbre de travail antérieur, mais avait été interrompu avant le rapport d’erreur final. Entre-temps, l’implémentation a été enregistrée dans le commit `1b0fd69`. Le diagnostic d’assertion de cet ancien échec n’est pas disponible; **sa cause historique exacte ne peut pas être déterminée** sans le résultat complet ou le snapshot exact de cet ancien état. Le succès isolé d’aujourd’hui montre que l’échec ne se reproduit pas sur le code courant, mais ne permet pas d’affirmer quel changement l’a corrigé. La suite complète n’a pas été exécutée dans cette phase.
 
 ## 3. Fonction de localisation dans `lidar_core.js`
 

@@ -6,7 +6,7 @@
 
 | Élément | Valeur |
 |---|---|
-| Commit Lidar Lab | `c62a2544b717e9e536e74ecfdd099146f4b2e47a` |
+| Commit Lidar Lab | `a9540b4df8d1a3564d9509c60aa2e933d31379e7` |
 | Version/commit TP-cartographie | à relever |
 | Paramètres LiDAR Lab | overlap 35 %, ambiguïté active, veto contradiction 14,2 % |
 | Filtres communs | à relever et harmoniser |

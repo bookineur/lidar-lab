@@ -1,7 +1,7 @@
 # PROTOCOLE_PHASE_1_9 — VALIDATION PHYSIQUE DE LA LOCALISATION
 
 **Statut :** à réaliser sur place. Aucun scan ni résultat physique n'est encore disponible dans ce protocole.  
-**Référence logicielle gelée :** commit `c62a2544b717e9e536e74ecfdd099146f4b2e47a`. Ne pas modifier ni recalibrer l'algorithme pendant l'acquisition et l'analyse de cette campagne.  
+**Référence logicielle gelée :** commit `a9540b4df8d1a3564d9509c60aa2e933d31379e7`. Ne pas modifier ni recalibrer l'algorithme pendant l'acquisition et l'analyse de cette campagne.  
 **But :** mesurer l'erreur de pose contre des repères physiques indépendants, puis comparer Lidar Lab et TP-cartographie sur les mêmes acquisitions.
 
 ## 1. Plan de l'expérience
