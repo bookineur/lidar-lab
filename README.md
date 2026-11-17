@@ -1,111 +1,87 @@
-# Lidar Lab (prototype)
+# Lidar Lab — cartographie et localisation en direct avec un robot et un lidar LD06
 
-Application locale, sans installation ni serveur, pour afficher et assembler visuellement plusieurs scans LiDAR, gérer leurs poses et évaluer leur recouvrement.
+Application web et serveur Node.js pour piloter un robot équipé d'un lidar LD06, construire la carte de la
+salle pendant le trajet (**Auto-SLAM**), localiser un scan sur la carte, assembler des séances enregistrées
+et faire explorer la salle au robot. Projet réalisé dans le cadre du module « Cartographie et
+localisation appliquée à la robotique mobile ».
 
-## Lancer
+C'est l'**outil 2** du projet ; l'outil 1 (bibliothèque Python *carto*, Lidar Plot et banc d'évaluation)
+est dans un dépôt séparé. Les deux outils lisent et écrivent les mêmes fichiers.
 
-Pour l’usage hors ligne, ouvrir `index.html` dans un navigateur récent et charger des CSV. Pour la capture USB LD06, servir ce dossier sur `http://localhost` (ex. `python -m http.server 8000`) et utiliser Chrome ou Edge. Pour une ESP32, utiliser `C:\Users\HP\TP-cartographie\arduino\ESP32_LD06_CSV_intensite\ESP32_LD06_CSV_intensite.ino` (Serial2, RX GPIO33, PWM GPIO32); `LD06_capture.ino` convient au câblage Serial1 correspondant. La sortie doit être CSV `printScanCSV`, pas Teleplot. Brancher la carte, cliquer « Connecter au robot » une fois et autoriser le port série à 921600 bauds. À chaque position, immobiliser le robot et observer l’aperçu en direct puis cliquer « Capturer le scan affiché »; l’option activée ancre le premier scan à l’origine puis recale les suivants sur la carte cumulée. Si une grid map est déjà chargée, elle localise le premier scan. Sélectionner une ligne et cliquer « Exporter le CSV brut du scan sélectionné » pour enregistrer sa mesure originale; déconnecter après le relevé. Les fichiers restent dans le navigateur; aucune donnée n’est envoyée en ligne.
+![Lidar Lab : un scan tiré au hasard est retrouvé sur la grid map, sans position de départ](docs/images/lidarlab_demo_localisation.png)
 
-Formats de scans pris en charge (délimiteurs virgule ou point-virgule; décimales point, et virgule pour les fichiers séparés par point-virgule) :
+## Fonctionnalités
 
-- Projet LD06 : `angle_deg,distance_mm,intensity`.
-- RobotControl : `angle_deg,distance_m,intensity`.
-- MapTool : `angle_deg,r_m,x_rel_m,y_rel_m`.
-- `printScanCSV` : `N,Angle,Distance,Intensity,x,y`.
-- Nuage fusionné cartésien : colonnes `x_m,y_m` (par exemple `scans_fusionnes.csv`).
+- **Robot** : pilotage depuis le PC (boutons, clavier) ou le téléphone, rotations de 15° et 45°, STOP
+  prioritaire ; liaison Wi-Fi avec l'ESP32 (sketch de référence `ESP32_robot_wifi_v5`, dépôt de l'outil 1).
+- **Auto-SLAM** : à chaque arrêt, un scan est capturé, localisé sur la grid map déjà construite et ajouté
+  s'il est fiable ; sinon il est mis en attente et réessayé quand la carte a grandi.
+- **Cartes** : grid map (cellules de 5 cm, log-odds), carte vectorielle, couche de points ; exports CSV,
+  format MapTool, poses JSON, image PNG.
+- **Localisation** : recherche globale sur toute la carte et sur 360°, refus des poses douteuses
+  (recouvrement insuffisant, ambiguïté sur le recouvrement, contradiction avec l'espace libre).
+- **Assemblage hors ligne** : bouton « Localiser et construire la carte » pour une séance enregistrée.
+- **Démonstration** : panneau « Où le robot a-t-il pris ce scan ? ».
+- **Exploration automatique** : le robot va seul vers la zone inconnue la plus proche, par petits pas
+  contrôlés à l'arrêt.
+- **Séances** : chaque relevé est enregistré sur le disque (scans, poses, grid map) et peut être repris.
 
-Un fichier de poses JSON du projet peut être chargé. Pour le scan sélectionné, le bouton « Utiliser pose connue » reprend sa pose `[x_m, y_m, theta_deg]`.
+![Interface](docs/images/lidarlab_vue_ensemble.png)
 
-## Connexion Wi-Fi sans câble
-
-Le sketch ESP32_robot_wifi_v2.ino crée le point d’accès Robot-LiDAR à l’adresse http://192.168.4.1. Il expose le dernier tour complet via GET /scan avec un identifiant de scan et l’en-tête CORS attendu par l’application.
-
-1. Téléverser ce sketch sur l’ESP32 qui reçoit le LD06, puis connecter le PC au Wi-Fi Robot-LiDAR.
-2. Lancer Lidar Lab sur http://localhost dans Chrome ou Edge. Garder le port de l’application sur localhost : le navigateur exige un contexte sécurisé pour contacter les appareils du réseau local.
-3. Dans « Connexion Wi-Fi au robot ESP32 », garder http://192.168.4.1 ou saisir l’adresse du robot si le sketch utilise une autre adresse; cliquer « Connecter en Wi-Fi » et autoriser le réseau local si le navigateur le demande.
-4. L’aperçu se rafraîchit par lecture HTTP des nouveaux tours. Capturer le tour affiché pour estimer la pose et l’ajouter à la carte cumulée, comme en USB. La liaison Wi-Fi de Lidar Lab reçoit les mesures; elle ne pilote pas les moteurs depuis cette page.
-
-## Pilotage du robot et téléphone reliés au PC
-
-Avec le sketch `ESP32_robot_wifi_v4` (dépôt TP-cartographie, dossier `arduino`) et le serveur `serveur_robot/serveur.js`, Lidar Lab pilote le robot, et le téléphone partage la même séance que le PC. Les scans sont enregistrés sur le disque.
-
-Le sketch v4 crée son propre Wi-Fi Robot-LiDAR. Pour ton installation — robot sur le Wi-Fi personnel de la box et PC connecté à cette box par câble Ethernet — utilise plutôt le sketch v5 décrit plus bas. Le PC n’a pas à rejoindre le point d’accès du robot. Les deux firmwares v4/v5 indiquent `moving=0/1` dans les scans; téléverse une version à jour pour que le serveur attende l’immobilisation sans interrompre une rotation.
-
-1. Téléverser `ESP32_robot_wifi_v4.ino` sur l’ESP32, puis connecter le PC au point d’accès Robot-LiDAR. Son mot de passe temporaire est affiché dans le moniteur série.
-2. Dans ce dossier, lancer `node serveur_robot/serveur.js`. La première fois, Windows demande l’accès réseau pour Node.js : cocher aussi « réseaux publics », car le Wi-Fi du robot est classé public. Sinon, le téléphone ne pourra pas joindre le PC.
-3. Sur le PC, ouvrir http://localhost:8000. Le panneau « Robot Wi-Fi · relié au PC » apparaît : pilotage avec les boutons ou les flèches / ZQSD (Espace = STOP), rotations 15° / 45°, aperçu en direct, « Capturer et ajouter à la carte ».
-4. Sur le téléphone, se connecter au Wi-Fi Robot-LiDAR et ouvrir http://192.168.4.1. Le robot renvoie automatiquement vers la version reliée au PC (`/telephone`).
-5. Chaque scan, pris depuis le PC ou depuis le téléphone, est enregistré dans `TP-cartographie/data/robot_wifi/seance_<date>/` (ou le dossier donné par `--dossier`). Il est recalé avec `lidar_core.js` et apparaît avec sa pose dans la liste de Lidar Lab. `poses.json`, `grid_map.csv` et `grid_map_map_tool.csv` y sont mis à jour à chaque scan, et `seance.json` permet de reprendre la séance au redémarrage du serveur.
-
-### Relevé incrémental en Auto-SLAM
-
-Dans le panneau PC ou téléphone, **Auto-SLAM est activé par défaut** (décoche-le pour le désactiver), puis déplace le robot avec les commandes du panneau. Le mode détecte aussi le passage `moving=1` à `moving=0` dans le flux LiDAR, même si le déplacement a été commandé depuis une autre interface. À l’arrêt, le serveur attend plusieurs tours complets et stables, capture puis recale le scan sur les murs déjà cartographiés; il ne l’intègre que si le recouvrement est assez fiable. Aucune capture ne coupe un mouvement. Le premier scan de référence se capture avec le bouton « Capturer et ajouter à la carte ». Un scan refusé peut être gardé en attente et recalé après un futur raccord, ou supprimé en décochant l’option de conservation. Les scans en attente n’altèrent jamais la carte. L’aperçu LiDAR reste visible en direct pendant le déplacement. Un déplacement manuel du robot, moteurs arrêtés, n’est pas détectable par le matériel actuel.
-
-Le robot reste piloté par toi : l’Auto-SLAM automatise la capture, la localisation et la mise à jour de la carte, pas la conduite ni l’évitement d’obstacles. Avance par petits déplacements et garde une partie déjà cartographiée dans le champ du LiDAR. Les panneaux PC et téléphone partagent la logique de déclenchement définie dans `serveur_robot/auto_slam.js`.
-
-**Avec ton propre Wi-Fi (sketch `ESP32_robot_wifi_v5`).** Copie `wifi_secrets_exemple.h` en `wifi_secrets.h` dans le dossier du sketch, puis inscris le SSID et le mot de passe personnels uniquement dans ce fichier ignoré par git. Ne place aucune vraie clé Wi-Fi dans le sketch, le README ou un fichier suivi. Choisis un réseau 2,4 GHz. Le robot s’y connecte en Wi-Fi; le PC peut être relié à la même box en Ethernet. Il faut que les deux appareils soient sur le même sous-réseau et que le Wi-Fi ne soit pas invité/isolation client. S'il n'arrive pas à rejoindre le Wi-Fi en 15 s, il recrée Robot-LiDAR avec un mot de passe temporaire unique affiché dans le moniteur série. Le serveur garde la dernière adresse du robot qui a répondu dans `robot_address.json`, puis tente mDNS, le point d’accès, et les sous-réseaux locaux. Si le PC et le robot sont sur des sous-réseaux différents mais routables, indique `--robot http://IP_DU_ROBOT`; sinon, place-les sur le même sous-réseau. Sur le téléphone, connecte-le au même réseau local et ouvre l’adresse « Téléphone » affichée par le serveur.
-
-Options du serveur : `--robot auto` (par défaut) ou `--robot http://192.168.1.37`, `--port 8000`, `--dossier C:\chemin`. Sans le serveur, Lidar Lab fonctionne comme avant, et la page du robot (http://192.168.4.1) reste utilisable seule.
-
-## Relevé incrémental et méthode SLAM
-
-Le flux d’utilisation est « observer → capturer → recaler → intégrer → déplacer un peu → recommencer ». L’aperçu USB est actualisé à chaque tour CSV complet du LiDAR; le blanc identifie le tour affiché, qui n’est pas encore ajouté à la carte. Le bouton capture ce tour sans attendre le suivant. Si la forme n’est pas stable ou lisible, attendre le prochain tour avant de cliquer.
-
-Le premier scan devient le repère local (x=0, y=0, θ=0°). Pour chaque scan suivant, l’application cherche sa pose sur la grid map formée par les scans déjà intégrés. Elle compare les points transformés aux cellules occupées, mesure le recouvrement et rejette une pose si le recouvrement minimal n’est pas atteint ou si une autre pose est presque aussi bonne. Un scan accepté ajoute ses retours à la carte; un scan refusé reste hors carte afin d’éviter de propager une pose incertaine. Continuer par petits déplacements avec des murs déjà cartographiés visibles dans le scan.
-
-C’est une **construction incrémentale de carte avec scan matching LiDAR** et une démonstration pédagogique d’une partie du SLAM 2D. Ce n’est pas une implémentation complète de Cartographer : la V1 ne possède ni odométrie codeur/IMU, ni graphe de poses, ni fermeture de boucle, ni optimisation qui corrige rétroactivement toute la trajectoire. Les poses sont relatives au premier scan et le drift peut donc s’accumuler. Cette distinction correspond à l’architecture décrite par Cartographer : scan matching local contre des sous-cartes, puis graphe global et contraintes de fermeture de boucle pour corriger la dérive ([article Google Cartographer](https://research.google/pubs/real-time-loop-closure-in-2d-lidar-slam/), [documentation du scan matcher 2D](https://google-cartographer.github.io/cartographer/configuration_files/trajectory_builder_2d.html)).
-
-### Essai avec le robot
-
-1. Démarrer la V1 sur localhost dans Chrome ou Edge; téléverser le sketch ESP32 qui envoie le CSV `printScanCSV`; fermer le moniteur série Arduino.
-2. Connecter le port série. Attendre l’aperçu blanc d’un tour complet; tourner le robot sur place ou le déplacer un peu pour reconnaître la salle.
-3. Capturer le premier scan pour fixer l’origine. Le résultat donne un repère local, pas la position absolue dans le bâtiment.
-4. Déplacer le robot d’une petite distance en gardant des murs communs, attendre que le nouveau contour se stabilise, puis capturer. Vérifier la pose X/Y/θ et l’alignement avant de poursuivre.
-5. Si le recalage est refusé, ne pas forcer l’intégration automatique : rapprocher le robot d’une zone déjà vue ou saisir une pose mesurée; un espace sans mur commun ne permet pas d’estimer le déplacement par LiDAR seul.
-6. Répéter jusqu’à couvrir la salle. Exporter la grid map et les poses pour conserver le résultat. Une vraie validation de SLAM nécessitera de comparer les poses et la carte à des mesures terrain indépendantes.
-
-## Utilisation
-
-1. Charger jusqu’à 200 scans par session, par fichiers CSV ou par capture USB avec l’esquisse `LD06_capture`; la capture directe reçoit le CSV texte du sketch et ne décode pas le flux binaire brut LD06. Cocher les scans à afficher. Un CSV de grid map se charge dans le champ séparé « Grid map CSV »; il s’affiche dans la vue Grid sans être interprété comme un scan à `0 pts`. Les fichiers MapTool avec `origin=(x,y)` et `cell=...` sont reconnus. Les CSV de nuage fusionné avec `x_m,y_m` sont aussi acceptés comme points cartésiens.
-2. Cliquer sur une ligne pour sélectionner le scan à manipuler; régler x, y et θ dans les champs.
-3. La vue par défaut est la grid map probabiliste, avec un pas initial de 5 cm réglable. Chaque rayon met à jour en log-odds les cellules traversées comme libres et la cellule d’impact comme occupée; les valeurs sont bornées pour éviter une certitude infinie. Le fond non observé reste inconnu. Le ray tracing utilise Bresenham. Le sélecteur permet aussi d’afficher le nuage ou les segments extraits.
-   Les seuils de distance entre points, longueur minimale et erreur de droite sont réglables; « Exporter vector_map.txt » écrit les segments retenus sous la forme `x1,y1,x2,y2`.
-4. Sur le graphique, glisser avec le bouton gauche pour déplacer le scan actif. Clic droit + glisser (ou Maj + glisser) le fait tourner.
-5. Zoomer avec la molette; déplacer la vue avec le bouton central de la souris. « Recadrer » réinitialise le zoom et centre à nouveau tous les scans visibles.
-6. Les boutons « Annuler » et « Rétablir » restaurent les poses précédentes (jusqu’à 50 opérations).
-7. Pour une localisation sans pose initiale, charger la grid map via « Grid map CSV », puis un scan brut LiDAR (angles/distances) et cliquer « Localiser automatiquement sur la grid map ». La recherche globale essaie les positions et orientations sur toute la carte, puis affine le meilleur candidat. La pose estimée X/Y/θ est appliquée au scan et affichée avec une erreur moyenne et un indicateur de qualité; une carte symétrique peut produire plusieurs poses ambiguës. Si le CSV de carte ne fournit pas son origine, régler Origine X/Y avant la localisation.
-   Pour un relevé de salle incrémental, ancrer le premier scan à (0,0,0°), puis sélectionner chaque scan suivant et cliquer « Localiser sur la carte cumulée ». L’application recale ce scan sur les précédents intégrés; la grid map se construit au fur et à mesure. La pose est relative au premier scan, et non à un repère géographique absolu. Le nettoyage règle portée et intensité. Le filtre temporel garde le scan initial intact et masque les retours isolés des scans suivants; les zones nouvelles demandent un scan de confirmation. L’intensité n’identifie pas à elle seule une personne; calibre le seuil avec tes mesures. Le recalage est accepté si au moins « Recouvrement min » (35 % par défaut) des points du scan tombent à moins de 10 cm (ou 2 cellules) d’un mur déjà cartographié et si aucune autre pose ne donne un score proche : une personne ou une zone nouvelle ne fait donc plus refuser le scan. La carte qui sert de référence au recalage contient aussi les murs vus une seule fois (non encore confirmés), sinon le scan suivant ne pourrait jamais les confirmer; la carte affichée et exportée garde, elle, le filtre temporel. Si le recouvrement est trop faible ou plusieurs poses se ressemblent, le scan est refusé et masqué; prends un scan intermédiaire avec des murs déjà cartographiés pour éviter de déformer la carte. Sans aucun mur commun (autre pièce, couloir aveugle), aucun recalage automatique n’est possible : place le scan à la main (pose mesurée ou odométrie), puis « Intégrer à la pose saisie (sans recalage) »; les scans suivants de cette zone se recalent ensuite dessus. Un CSV sans colonne d’intensité (Teleplot, MapTool) n’est pas filtré par le seuil d’intensité.
-   Pour un recalage local, choisir une référence et un scan cible; « Auto-aligner (ICP) » affine la pose du scan cible à partir de la pose actuelle. Le scan doit être placé à proximité de la bonne solution pour éviter un mauvais minimum local.
-   « Recherche exhaustive Grid » retire temporairement le scan cible de la carte et recherche sa pose dans la fenêtre et avec le pas réglés dans les champs. Les autres scans visibles forment la grid map de référence, puis un raffinement local améliore le résultat.
-   « Localiser sur carte vectorielle » fait la recherche avec les mêmes réglages en minimisant les distances point-segment vers les segments extraits des autres scans visibles.
-   « Comparer les méthodes » exécute ces deux recherches et l’ICP depuis la même pose initiale, affiche leurs poses et temps, puis permet d’appliquer un résultat ou d’exporter `comparaison_localisation.csv`. Si des poses de référence sont chargées, l’écart position/angle est aussi affiché. Les résidus diffèrent selon le type de référence; ce tableau est un diagnostic, pas un classement direct des scores.
-   « Sensibilité à la pose initiale » lance des essais Grid, vectoriels et ICP appariés aux perturbations 5 cm / 2°, 15 cm / 5° et 25 cm / 8°. Il faut charger une pose de référence et sélectionner un scan de référence différent du scan cible pour l’ICP; le seuil de réussite est 5 cm et 2°. Les essais peuvent être exportés en `sensibilite_localisation.csv`.
-8. « Aligner tous les scans » parcourt les scans visibles dans l’ordre de chargement et tente de les raccorder au nuage déjà assemblé, à partir de la pose initiale de chacun. C’est un recalage en chaîne, pas une optimisation globale de graphe; contrôlez les poses obtenues.
-9. « Évaluer vs référence » rapporte le recouvrement après alignement.
-10. « Fusionner / exporter CSV » produit un nuage combiné des scans visibles dans le repère carte, avec coordonnées et intensité.
-11. « Exporter la carte en PNG » enregistre l’image de la superposition affichée. « Exporter grid_map.csv » produit une matrice du haut vers le bas avec l’origine et le pas en commentaire; les valeurs sont `-1` inconnu, `0` libre et `1` occupé. « Exporter grid MapTool (0/1) » écrit la même carte dans le format binaire du MapTool, avec son origine et sa résolution. Les deux formats s’importent ensuite via « Grid map CSV ».
-12. Exporter `experience_lidar.json` pour conserver les poses, la visibilité, les résultats affichés, la résolution de grille et les seuils de segmentation.
-13. « Exporter poses.json » écrit les poses au format `{nom_scan: [x_m, y_m, theta_deg]}`, réutilisable par le projet `TP-cartographie`.
-14. « Ouvrir expérience » recharge les poses et la visibilité depuis un export précédent; il faut d’abord charger les mêmes scans CSV.
-
-Le score est la distance quadratique moyenne de chaque point du scan cible transformé à son point le plus proche dans la référence transformée. Le taux indique la part des points sous le seuil choisi. Ces indicateurs sont pédagogiques : ils ne prouvent pas à eux seuls qu’une pose est correcte et peuvent être trompés par une géométrie répétitive ou des objets mobiles.
-
-## Tests automatisés (simulation)
-
-Les calculs (lecture CSV, filtres portée/intensité, filtre temporel, grid map, localisation) sont dans `lidar_core.js`, chargé par `index.html`. Les tests pilotent le vrai `index.html` dans Node avec un DOM simulé et des scans LD06 **synthétiques** (lancer de rayons, graine fixe) : ce ne sont pas des mesures du robot.
+## Démarrage rapide
 
 ```bash
-node --test "tests/*.test.js"
-node tests/rapport_simulation.js
+node --test tests/*.test.js                                  # 64 tests (Node.js 20 ou plus récent)
+node serveur_robot/serveur.js --dossier <dossier_des_seances>   # puis ouvrir http://localhost:8000
 ```
 
-Le second script compare la V1.0 archivée (`anciennes_versions/index_v1.0_e37950a.html`) et la version actuelle et écrit `tests/resultats_simulation.md`. Des scans simulés prêts à charger sont dans `tests/donnees_simulees/` (préfixe `SIM_`). `tests/v1_usb_capture.test.js` vérifie l’aperçu et la capture USB avec un **faux port série**, ainsi que la lecture Wi-Fi de `/scan` avec une réponse HTTP simulée. Les simulations testent le logiciel, pas le réseau du robot, le câble, la carte ni le LD06 réels.
+Sans robot : ouvrir `index.html` dans Chrome ou Edge et charger des scans CSV (par exemple ceux du dossier
+`data/` de l'outil 1). Avec le robot : téléverser `ESP32_robot_wifi_v5`, connecter le PC au même réseau,
+lancer le serveur ; il trouve le robot tout seul. Le téléphone s'utilise sur `/telephone`.
 
-## Limites
+## Architecture
 
-- La capture directe est prévue pour une carte avec le sketch CSV `LD06_capture`; le navigateur ne décode pas le protocole binaire LD06 via adaptateur USB-UART.
-- Le flux série donne un aperçu à chaque tour; le recalage et l’ajout à la carte se font à la demande, lorsque l’utilisateur capture. Il n’y a pas de commande moteur ni d’odométrie intégrée.
-- La qualité doit être validée avec des poses terrain indépendantes; les zones symétriques, les obstacles mobiles, l’origine de grille et le mouvement pendant un tour LiDAR peuvent fausser l’estimation.
-- Le filtre temporel garde le scan initial intact : une personne présente dans ce scan reste dans la carte. Une personne immobile au même endroit dans deux scans est confirmée comme un mur.
-- Sans mur commun avec la carte, la localisation globale ne peut pas savoir où est le robot : le scan est refusé (ou, si une autre pièce ressemble à une pièce déjà cartographiée, il pourrait être mal placé); il faut alors saisir la pose.
-- L’application ne commande pas le robot.
+```
+ESP32 + LD06  <-- HTTP / Wi-Fi -->  serveur_robot/serveur.js  <-->  navigateur : index.html + lidar_core.js
+ /scan /drive /turn /stop            séances sur disque, Auto-SLAM,      interface, couches, localisation,
+                                     exploration.js                      pilote_lidar_lab.js, demo_localisation.js
+                                            ^
+                                            +-- téléphone : serveur_robot/telephone.html (même séance)
+```
+
+| Fichier | Rôle |
+|---|---|
+| `lidar_core.js` | Cœur de calcul, sans dépendance au navigateur : lecture des CSV, filtres, grid map, `locateScanOnGrid`, choix du candidat, assemblage d'une séance |
+| `index.html` | Interface : chargement, couches, localisation, comparaisons, exports |
+| `serveur_robot/serveur.js` | Relais vers le robot, séances, Auto-SLAM, routes de l'exploration |
+| `serveur_robot/pilote_lidar_lab.js` | Panneau de pilotage dans l'interface |
+| `serveur_robot/exploration.js` | Exploration par frontières (chemin sur la grille, contrôle à l'arrêt, demi-tour) |
+| `serveur_robot/telephone.html` | Version téléphone |
+| `demo_localisation.js` | Démo de localisation d'un scan tiré au hasard |
+| `tests/` | Tests : capture USB (faux port série), serveur, assemblage hors ligne, corpus de faux positifs, exploration sur robot simulé |
+| `docs/validation/` | Protocoles et rapports de validation de la localisation |
+| `prototypes/version_2/` | Prototype de la version suivante de l'interface (en cours) |
+| `anciennes_versions/` | Versions précédentes des fichiers modifiés |
+
+## Résultats
+
+| Expérience | Résultat |
+|---|---|
+| Séance réelle du 10/11 (49 scans) | 48 scans recalés par l'Auto-SLAM ; carte complète de la salle (environ 13 × 12 m) |
+| Localisation d'un scan sans position de départ (48 scans réels) | 42 retrouvés, 0 fausse position, écart médian 2,5 cm avec l'Auto-SLAM |
+| Fausses poses de l'assemblage (600 scans simulés jamais utilisés pour le réglage) | 255 → 48 → 2 avec les règles d'ambiguïté et d'espace libre |
+| Exploration sur robot simulé (salle jamais vue) | 0 collision, 95 à 96 % de la salle cartographiée |
+
+![Carte vectorielle](docs/images/lidarlab_couche_vectorielle.png)
+
+## Documentation
+
+- [Guide d'utilisation détaillé](docs/GUIDE_UTILISATION.md) : formats de scans acceptés, liaison USB et
+  Wi-Fi, pilotage, Auto-SLAM, téléphone.
+- [Validation](docs/validation/) : protocoles, critères fixés avant les mesures, résultats.
+
+## Formats
+
+Scans : `angle_deg,distance_mm,intensity` (projet LD06), `angle_deg,distance_m,intensity` (RobotControl),
+`angle_deg,r_m,x_rel_m,y_rel_m` (MapTool), nuage cartésien `x_m,y_m`. Poses : JSON
+`{"scan": [x_m, y_m, theta_deg]}`. Grid map : CSV du projet ou format MapTool.
