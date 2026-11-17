@@ -150,4 +150,4 @@ Le dépôt `codex_lidar` était déjà modifié avant cet audit (`index.html`, `
 - `C:\Users\HP\TP-cartographie\data\robot_wifi\seance_2026-11-04_17h42m59\reference_autoslam_2026-11-04.json`
 - `C:\Users\HP\TP-cartographie\data\repetition_tp2\verite.json` et `poses.json`
 - `C:\Users\HP\TP-cartographie\README.md`, `carto/scan.py`, `carto/register.py`, `carto/localisation.py`, `resultats/localisation/version_1/synthese.md`
-- `lidar_lab\lidar_core.js`, `serveur_robot/auto_slam.js`, `tests/resultats_simulation.md`, `tests/assemblage_hors_ligne.test.js`
+- `lidar_lab/lidar_core.js`, `serveur_robot/auto_slam.js`, `tests/resultats_simulation.md`, `tests/assemblage_hors_ligne.test.js`
