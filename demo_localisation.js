@@ -125,6 +125,27 @@
       xy = (x, y) => [ox + camera.dx + (x - minX) * scale * camera.zoom, r.height - (oy + camera.dy + (y - minY) * scale * camera.zoom)];
     view = { minX, minY, scale, ox, oy, w: r.width, h: r.height };
     const pts = filteredScanPoints(demo.target);
+    // quadrillage d'un mètre avec les coordonnées sur les bords : on lit où se trouve le robot
+    {
+      const [x0w, y0w] = [minX + (-ox - camera.dx) / (scale * camera.zoom), minY + (-oy - camera.dy) / (scale * camera.zoom)];
+      const [x1w, y1w] = [x0w + r.width / (scale * camera.zoom), y0w + r.height / (scale * camera.zoom)];
+      ctx.save();
+      ctx.strokeStyle = "rgba(154,171,192,0.18)";
+      ctx.fillStyle = "#9aabc0";
+      ctx.font = "11px system-ui";
+      ctx.lineWidth = 1;
+      for (let gx = Math.ceil(x0w); gx <= x1w; gx++) {
+        const [sx] = xy(gx, 0);
+        ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, r.height); ctx.stroke();
+        ctx.fillText(gx + " m", sx + 2, r.height - 6);
+      }
+      for (let gy = Math.ceil(y0w); gy <= y1w; gy++) {
+        const [, sy] = xy(0, gy);
+        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(r.width, sy); ctx.stroke();
+        ctx.fillText(gy + " m", 4, sy - 3);
+      }
+      ctx.restore();
+    }
     // encadré : le scan tel que vu par le robot (repère du robot)
     const B = 210, bx = 12, by = 28, k = B / 2 / 6;
     ctx.fillStyle = "#0b1017ee";
@@ -159,10 +180,11 @@
     // pose enregistrée par l'Auto-SLAM (comparaison)
     const [qx, qy] = xy(demo.recorded[0], demo.recorded[1]);
     ctx.strokeStyle = "#68ddd1";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(qx, qy, 11, 0, 7);
+    ctx.arc(qx, qy, 16, 0, 7);
     ctx.stroke();
+    ctx.lineWidth = 1;
     if (!res.ok || !res.pose) return;
     // le scan placé à la position trouvée
     ctx.fillStyle = "#f2c94c";
@@ -172,19 +194,38 @@
     }
     const [x, y] = xy(res.pose[0], res.pose[1]),
       a = (res.pose[2] * Math.PI) / 180;
+    // lignes de repère jusqu'aux bords (lecture des coordonnées sur le quadrillage)
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = "rgba(242,201,76,0.75)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, r.height); ctx.moveTo(x, y); ctx.lineTo(0, y); ctx.stroke();
+    ctx.restore();
     ctx.fillStyle = "#f2c94c";
     ctx.beginPath();
-    ctx.arc(x, y, 7, 0, 7);
+    ctx.arc(x, y, 10, 0, 7);
     ctx.fill();
     ctx.strokeStyle = "#f2c94c";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + 26 * Math.cos(a), y - 26 * Math.sin(a));
+    ctx.lineTo(x + 42 * Math.cos(a), y - 42 * Math.sin(a));
     ctx.stroke();
     ctx.lineWidth = 1;
-    ctx.font = "bold 13px system-ui";
-    ctx.fillText("robot : " + res.pose[0].toFixed(2) + " ; " + res.pose[1].toFixed(2) + " m", x + 12, y + 22);
+    // cadre « Robot ici » près du robot
+    const label = "Robot ici : x = " + res.pose[0].toFixed(2) + " m, y = " + res.pose[1].toFixed(2) + " m, θ = " + ((((res.pose[2] % 360) + 540) % 360) - 180).toFixed(0) + "°";
+    ctx.font = "bold 16px system-ui";
+    const tw = ctx.measureText(label).width,
+      lx = Math.min(r.width - tw - 24, x + 20),
+      ly = Math.max(30, y - 46);
+    ctx.fillStyle = "#0b1017ee";
+    ctx.fillRect(lx - 8, ly - 20, tw + 16, 30);
+    ctx.strokeStyle = "#f2c94c";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(lx - 8, ly - 20, tw + 16, 30);
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "#f2c94c";
+    ctx.fillText(label, lx, ly);
   }
 
   const baseDraw = draw;
