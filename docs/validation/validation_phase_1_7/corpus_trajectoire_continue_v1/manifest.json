@@ -1,0 +1,1687 @@
+{
+  "type": "simulation_deterministe_pas_mesures_robot",
+  "generated_utc": "2026-11-08T20:10:16.848Z",
+  "generator": "generer_corpus.js",
+  "environment": "salle 9x7 m, porte dans une cloison, corridor en U à murs parallèles et obstacles statiques",
+  "constraints": {
+    "max_translation_per_step_m": 0.15,
+    "max_rotation_per_step_deg": 10,
+    "scans": 130
+  },
+  "waypoints": [
+    {
+      "pose": [
+        1.2,
+        1.2,
+        0
+      ],
+      "phase": "depart"
+    },
+    {
+      "pose": [
+        2.1,
+        1.2,
+        0
+      ],
+      "phase": "petit_deplacement"
+    },
+    {
+      "pose": [
+        2.1,
+        1.2,
+        90
+      ],
+      "phase": "rotation_sur_place"
+    },
+    {
+      "pose": [
+        2.1,
+        2.8,
+        90
+      ],
+      "phase": "approche_porte"
+    },
+    {
+      "pose": [
+        3.6,
+        2.8,
+        0
+      ],
+      "phase": "traversee_porte"
+    },
+    {
+      "pose": [
+        5.2,
+        2.8,
+        0
+      ],
+      "phase": "zone_ouverte"
+    },
+    {
+      "pose": [
+        5.2,
+        2.8,
+        -90
+      ],
+      "phase": "rotation_sur_place"
+    },
+    {
+      "pose": [
+        5.2,
+        1.4,
+        -90
+      ],
+      "phase": "approche_corridor"
+    },
+    {
+      "pose": [
+        5.5,
+        0.6,
+        -45
+      ],
+      "phase": "contournement_entree"
+    },
+    {
+      "pose": [
+        7.4,
+        0.6,
+        0
+      ],
+      "phase": "entree_corridor"
+    },
+    {
+      "pose": [
+        7.4,
+        3.9,
+        90
+      ],
+      "phase": "corridor_parallele"
+    },
+    {
+      "pose": [
+        7.4,
+        3.9,
+        180
+      ],
+      "phase": "rotation_sur_place"
+    },
+    {
+      "pose": [
+        6.8,
+        3.9,
+        180
+      ],
+      "phase": "retour_corridor"
+    },
+    {
+      "pose": [
+        5.8,
+        3.9,
+        180
+      ],
+      "phase": "sortie_corridor"
+    }
+  ],
+  "scans": [
+    {
+      "name": "scan_001.csv",
+      "index": 1,
+      "phase": "depart",
+      "truth": {
+        "x_m": 1.2,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711000,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_002.csv",
+      "index": 2,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 1.328571,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711001,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_003.csv",
+      "index": 3,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 1.457143,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711002,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_004.csv",
+      "index": 4,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 1.585714,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711003,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_005.csv",
+      "index": 5,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 1.714286,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711004,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_006.csv",
+      "index": 6,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 1.842857,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711005,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_007.csv",
+      "index": 7,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 1.971429,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711006,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_008.csv",
+      "index": 8,
+      "phase": "petit_deplacement",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 0
+      },
+      "seed": 1711007,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_009.csv",
+      "index": 9,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 10
+      },
+      "seed": 1711008,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_010.csv",
+      "index": 10,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 20
+      },
+      "seed": 1711009,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_011.csv",
+      "index": 11,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 30
+      },
+      "seed": 1711010,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_012.csv",
+      "index": 12,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 40
+      },
+      "seed": 1711011,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_013.csv",
+      "index": 13,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 50
+      },
+      "seed": 1711012,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_014.csv",
+      "index": 14,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 60
+      },
+      "seed": 1711013,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_015.csv",
+      "index": 15,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 70
+      },
+      "seed": 1711014,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_016.csv",
+      "index": 16,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 80
+      },
+      "seed": 1711015,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_017.csv",
+      "index": 17,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.2,
+        "theta_deg": 90
+      },
+      "seed": 1711016,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_018.csv",
+      "index": 18,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.345455,
+        "theta_deg": 90
+      },
+      "seed": 1711017,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_019.csv",
+      "index": 19,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.490909,
+        "theta_deg": 90
+      },
+      "seed": 1711018,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_020.csv",
+      "index": 20,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.636364,
+        "theta_deg": 90
+      },
+      "seed": 1711019,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_021.csv",
+      "index": 21,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.781818,
+        "theta_deg": 90
+      },
+      "seed": 1711020,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_022.csv",
+      "index": 22,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 1.927273,
+        "theta_deg": 90
+      },
+      "seed": 1711021,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_023.csv",
+      "index": 23,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 2.072727,
+        "theta_deg": 90
+      },
+      "seed": 1711022,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_024.csv",
+      "index": 24,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 2.218182,
+        "theta_deg": 90
+      },
+      "seed": 1711023,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_025.csv",
+      "index": 25,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 2.363636,
+        "theta_deg": 90
+      },
+      "seed": 1711024,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_026.csv",
+      "index": 26,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 2.509091,
+        "theta_deg": 90
+      },
+      "seed": 1711025,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_027.csv",
+      "index": 27,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 2.654545,
+        "theta_deg": 90
+      },
+      "seed": 1711026,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_028.csv",
+      "index": 28,
+      "phase": "approche_porte",
+      "truth": {
+        "x_m": 2.1,
+        "y_m": 2.8,
+        "theta_deg": 90
+      },
+      "seed": 1711027,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_029.csv",
+      "index": 29,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 2.25,
+        "y_m": 2.8,
+        "theta_deg": 81
+      },
+      "seed": 1711028,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_030.csv",
+      "index": 30,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 2.4,
+        "y_m": 2.8,
+        "theta_deg": 72
+      },
+      "seed": 1711029,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_031.csv",
+      "index": 31,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 2.55,
+        "y_m": 2.8,
+        "theta_deg": 63
+      },
+      "seed": 1711030,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_032.csv",
+      "index": 32,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 2.7,
+        "y_m": 2.8,
+        "theta_deg": 54
+      },
+      "seed": 1711031,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_033.csv",
+      "index": 33,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 2.85,
+        "y_m": 2.8,
+        "theta_deg": 45
+      },
+      "seed": 1711032,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_034.csv",
+      "index": 34,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 3,
+        "y_m": 2.8,
+        "theta_deg": 36
+      },
+      "seed": 1711033,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_035.csv",
+      "index": 35,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 3.15,
+        "y_m": 2.8,
+        "theta_deg": 27
+      },
+      "seed": 1711034,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_036.csv",
+      "index": 36,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 3.3,
+        "y_m": 2.8,
+        "theta_deg": 18
+      },
+      "seed": 1711035,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_037.csv",
+      "index": 37,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 3.45,
+        "y_m": 2.8,
+        "theta_deg": 9
+      },
+      "seed": 1711036,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_038.csv",
+      "index": 38,
+      "phase": "traversee_porte",
+      "truth": {
+        "x_m": 3.6,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711037,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_039.csv",
+      "index": 39,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 3.745455,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711038,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_040.csv",
+      "index": 40,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 3.890909,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711039,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_041.csv",
+      "index": 41,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.036364,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711040,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_042.csv",
+      "index": 42,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.181818,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711041,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_043.csv",
+      "index": 43,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.327273,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711042,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_044.csv",
+      "index": 44,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.472727,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711043,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_045.csv",
+      "index": 45,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.618182,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711044,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_046.csv",
+      "index": 46,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.763636,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711045,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_047.csv",
+      "index": 47,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 4.909091,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711046,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_048.csv",
+      "index": 48,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 5.054545,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711047,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_049.csv",
+      "index": 49,
+      "phase": "zone_ouverte",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": 0
+      },
+      "seed": 1711048,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_050.csv",
+      "index": 50,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -10
+      },
+      "seed": 1711049,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_051.csv",
+      "index": 51,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -20
+      },
+      "seed": 1711050,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_052.csv",
+      "index": 52,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -30
+      },
+      "seed": 1711051,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_053.csv",
+      "index": 53,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -40
+      },
+      "seed": 1711052,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_054.csv",
+      "index": 54,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -50
+      },
+      "seed": 1711053,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_055.csv",
+      "index": 55,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -60
+      },
+      "seed": 1711054,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_056.csv",
+      "index": 56,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -70
+      },
+      "seed": 1711055,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_057.csv",
+      "index": 57,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -80
+      },
+      "seed": 1711056,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_058.csv",
+      "index": 58,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.8,
+        "theta_deg": -90
+      },
+      "seed": 1711057,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_059.csv",
+      "index": 59,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.66,
+        "theta_deg": -90
+      },
+      "seed": 1711058,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_060.csv",
+      "index": 60,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.52,
+        "theta_deg": -90
+      },
+      "seed": 1711059,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_061.csv",
+      "index": 61,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.38,
+        "theta_deg": -90
+      },
+      "seed": 1711060,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_062.csv",
+      "index": 62,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.24,
+        "theta_deg": -90
+      },
+      "seed": 1711061,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_063.csv",
+      "index": 63,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 2.1,
+        "theta_deg": -90
+      },
+      "seed": 1711062,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_064.csv",
+      "index": 64,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 1.96,
+        "theta_deg": -90
+      },
+      "seed": 1711063,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_065.csv",
+      "index": 65,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 1.82,
+        "theta_deg": -90
+      },
+      "seed": 1711064,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_066.csv",
+      "index": 66,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 1.68,
+        "theta_deg": -90
+      },
+      "seed": 1711065,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_067.csv",
+      "index": 67,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 1.54,
+        "theta_deg": -90
+      },
+      "seed": 1711066,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_068.csv",
+      "index": 68,
+      "phase": "approche_corridor",
+      "truth": {
+        "x_m": 5.2,
+        "y_m": 1.4,
+        "theta_deg": -90
+      },
+      "seed": 1711067,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_069.csv",
+      "index": 69,
+      "phase": "contournement_entree",
+      "truth": {
+        "x_m": 5.25,
+        "y_m": 1.266667,
+        "theta_deg": -82.5
+      },
+      "seed": 1711068,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_070.csv",
+      "index": 70,
+      "phase": "contournement_entree",
+      "truth": {
+        "x_m": 5.3,
+        "y_m": 1.133333,
+        "theta_deg": -75
+      },
+      "seed": 1711069,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_071.csv",
+      "index": 71,
+      "phase": "contournement_entree",
+      "truth": {
+        "x_m": 5.35,
+        "y_m": 1,
+        "theta_deg": -67.5
+      },
+      "seed": 1711070,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_072.csv",
+      "index": 72,
+      "phase": "contournement_entree",
+      "truth": {
+        "x_m": 5.4,
+        "y_m": 0.866667,
+        "theta_deg": -60
+      },
+      "seed": 1711071,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_073.csv",
+      "index": 73,
+      "phase": "contournement_entree",
+      "truth": {
+        "x_m": 5.45,
+        "y_m": 0.733333,
+        "theta_deg": -52.5
+      },
+      "seed": 1711072,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_074.csv",
+      "index": 74,
+      "phase": "contournement_entree",
+      "truth": {
+        "x_m": 5.5,
+        "y_m": 0.6,
+        "theta_deg": -45
+      },
+      "seed": 1711073,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_075.csv",
+      "index": 75,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 5.646154,
+        "y_m": 0.6,
+        "theta_deg": -41.538462
+      },
+      "seed": 1711074,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_076.csv",
+      "index": 76,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 5.792308,
+        "y_m": 0.6,
+        "theta_deg": -38.076923
+      },
+      "seed": 1711075,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_077.csv",
+      "index": 77,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 5.938462,
+        "y_m": 0.6,
+        "theta_deg": -34.615385
+      },
+      "seed": 1711076,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_078.csv",
+      "index": 78,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.084615,
+        "y_m": 0.6,
+        "theta_deg": -31.153846
+      },
+      "seed": 1711077,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_079.csv",
+      "index": 79,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.230769,
+        "y_m": 0.6,
+        "theta_deg": -27.692308
+      },
+      "seed": 1711078,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_080.csv",
+      "index": 80,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.376923,
+        "y_m": 0.6,
+        "theta_deg": -24.230769
+      },
+      "seed": 1711079,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_081.csv",
+      "index": 81,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.523077,
+        "y_m": 0.6,
+        "theta_deg": -20.769231
+      },
+      "seed": 1711080,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_082.csv",
+      "index": 82,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.669231,
+        "y_m": 0.6,
+        "theta_deg": -17.307692
+      },
+      "seed": 1711081,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_083.csv",
+      "index": 83,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.815385,
+        "y_m": 0.6,
+        "theta_deg": -13.846154
+      },
+      "seed": 1711082,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_084.csv",
+      "index": 84,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 6.961538,
+        "y_m": 0.6,
+        "theta_deg": -10.384615
+      },
+      "seed": 1711083,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_085.csv",
+      "index": 85,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 7.107692,
+        "y_m": 0.6,
+        "theta_deg": -6.923077
+      },
+      "seed": 1711084,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_086.csv",
+      "index": 86,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 7.253846,
+        "y_m": 0.6,
+        "theta_deg": -3.461538
+      },
+      "seed": 1711085,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_087.csv",
+      "index": 87,
+      "phase": "entree_corridor",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 0.6,
+        "theta_deg": 0
+      },
+      "seed": 1711086,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_088.csv",
+      "index": 88,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 0.75,
+        "theta_deg": 4.090909
+      },
+      "seed": 1711087,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_089.csv",
+      "index": 89,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 0.9,
+        "theta_deg": 8.181818
+      },
+      "seed": 1711088,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_090.csv",
+      "index": 90,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.05,
+        "theta_deg": 12.272727
+      },
+      "seed": 1711089,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_091.csv",
+      "index": 91,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.2,
+        "theta_deg": 16.363636
+      },
+      "seed": 1711090,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_092.csv",
+      "index": 92,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.35,
+        "theta_deg": 20.454545
+      },
+      "seed": 1711091,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_093.csv",
+      "index": 93,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.5,
+        "theta_deg": 24.545455
+      },
+      "seed": 1711092,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_094.csv",
+      "index": 94,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.65,
+        "theta_deg": 28.636364
+      },
+      "seed": 1711093,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_095.csv",
+      "index": 95,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.8,
+        "theta_deg": 32.727273
+      },
+      "seed": 1711094,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_096.csv",
+      "index": 96,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 1.95,
+        "theta_deg": 36.818182
+      },
+      "seed": 1711095,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_097.csv",
+      "index": 97,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 2.1,
+        "theta_deg": 40.909091
+      },
+      "seed": 1711096,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_098.csv",
+      "index": 98,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 2.25,
+        "theta_deg": 45
+      },
+      "seed": 1711097,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_099.csv",
+      "index": 99,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 2.4,
+        "theta_deg": 49.090909
+      },
+      "seed": 1711098,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_100.csv",
+      "index": 100,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 2.55,
+        "theta_deg": 53.181818
+      },
+      "seed": 1711099,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_101.csv",
+      "index": 101,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 2.7,
+        "theta_deg": 57.272727
+      },
+      "seed": 1711100,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_102.csv",
+      "index": 102,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 2.85,
+        "theta_deg": 61.363636
+      },
+      "seed": 1711101,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_103.csv",
+      "index": 103,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3,
+        "theta_deg": 65.454545
+      },
+      "seed": 1711102,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_104.csv",
+      "index": 104,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.15,
+        "theta_deg": 69.545455
+      },
+      "seed": 1711103,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_105.csv",
+      "index": 105,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.3,
+        "theta_deg": 73.636364
+      },
+      "seed": 1711104,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_106.csv",
+      "index": 106,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.45,
+        "theta_deg": 77.727273
+      },
+      "seed": 1711105,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_107.csv",
+      "index": 107,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.6,
+        "theta_deg": 81.818182
+      },
+      "seed": 1711106,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_108.csv",
+      "index": 108,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.75,
+        "theta_deg": 85.909091
+      },
+      "seed": 1711107,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_109.csv",
+      "index": 109,
+      "phase": "corridor_parallele",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 90
+      },
+      "seed": 1711108,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_110.csv",
+      "index": 110,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 100
+      },
+      "seed": 1711109,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_111.csv",
+      "index": 111,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 110
+      },
+      "seed": 1711110,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_112.csv",
+      "index": 112,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 120
+      },
+      "seed": 1711111,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_113.csv",
+      "index": 113,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 130
+      },
+      "seed": 1711112,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_114.csv",
+      "index": 114,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 140
+      },
+      "seed": 1711113,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_115.csv",
+      "index": 115,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 150
+      },
+      "seed": 1711114,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_116.csv",
+      "index": 116,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 160
+      },
+      "seed": 1711115,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_117.csv",
+      "index": 117,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": 170
+      },
+      "seed": 1711116,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_118.csv",
+      "index": 118,
+      "phase": "rotation_sur_place",
+      "truth": {
+        "x_m": 7.4,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711117,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_119.csv",
+      "index": 119,
+      "phase": "retour_corridor",
+      "truth": {
+        "x_m": 7.28,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711118,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_120.csv",
+      "index": 120,
+      "phase": "retour_corridor",
+      "truth": {
+        "x_m": 7.16,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711119,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_121.csv",
+      "index": 121,
+      "phase": "retour_corridor",
+      "truth": {
+        "x_m": 7.04,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711120,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_122.csv",
+      "index": 122,
+      "phase": "retour_corridor",
+      "truth": {
+        "x_m": 6.92,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711121,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_123.csv",
+      "index": 123,
+      "phase": "retour_corridor",
+      "truth": {
+        "x_m": 6.8,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711122,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_124.csv",
+      "index": 124,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 6.657143,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711123,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_125.csv",
+      "index": 125,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 6.514286,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711124,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_126.csv",
+      "index": 126,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 6.371429,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711125,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_127.csv",
+      "index": 127,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 6.228571,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711126,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_128.csv",
+      "index": 128,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 6.085714,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711127,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_129.csv",
+      "index": 129,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 5.942857,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711128,
+      "point_count_generated": 450
+    },
+    {
+      "name": "scan_130.csv",
+      "index": 130,
+      "phase": "sortie_corridor",
+      "truth": {
+        "x_m": 5.8,
+        "y_m": 3.9,
+        "theta_deg": -180
+      },
+      "seed": 1711129,
+      "point_count_generated": 450
+    }
+  ]
+}

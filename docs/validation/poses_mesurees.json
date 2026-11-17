@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "campagne": "Phase 1.9 — à compléter sur place",
+  "reference_logicielle": "c62a2544b717e9e536e74ecfdd099146f4b2e47a",
+  "repere_monde": {
+    "origine": "à définir avec R1",
+    "axe_x": "à matérialiser au sol",
+    "axe_y": "perpendiculaire à X, sens direct",
+    "unite_position": "m",
+    "unite_angle": "deg",
+    "convention_angle": "trigonométrique, 0 deg vers +X"
+  },
+  "instruments": {
+    "mesure_distance": {
+      "modele": null,
+      "resolution_m": null,
+      "precision_annoncee_m": null
+    },
+    "mesure_angle": {
+      "modele_ou_methode": null,
+      "resolution_deg": null,
+      "precision_annoncee_deg": null
+    },
+    "decalage_chassis_vers_centre_lidar": {
+      "x_m": null,
+      "y_m": null,
+      "incertitude_x_m": null,
+      "incertitude_y_m": null
+    }
+  },
+  "reperes_sol": [
+    { "id": "R1", "x_m": null, "y_m": null, "incertitude_x_m": null, "incertitude_y_m": null, "notes": "" },
+    { "id": "R2", "x_m": null, "y_m": null, "incertitude_x_m": null, "incertitude_y_m": null, "notes": "" },
+    { "id": "R3", "x_m": null, "y_m": null, "incertitude_x_m": null, "incertitude_y_m": null, "notes": "" }
+  ],
+  "poses": [
+    { "id": "P01", "repere_sol": "R1", "ordre_capture": 1, "scan": "scans_references/scan_P01.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P02", "repere_sol": "R1", "ordre_capture": 2, "scan": "scans_references/scan_P02.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P03", "repere_sol": "R1", "ordre_capture": 3, "scan": "scans_references/scan_P03.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P04", "repere_sol": "R2", "ordre_capture": 4, "scan": "scans_references/scan_P04.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P05", "repere_sol": "R2", "ordre_capture": 5, "scan": "scans_references/scan_P05.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P06", "repere_sol": "R2", "ordre_capture": 6, "scan": "scans_references/scan_P06.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P07", "repere_sol": "R3", "ordre_capture": 7, "scan": "scans_references/scan_P07.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P08", "repere_sol": "R3", "ordre_capture": 8, "scan": "scans_references/scan_P08.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" },
+    { "id": "P09", "repere_sol": "R3", "ordre_capture": 9, "scan": "scans_references/scan_P09.csv", "pose_vraie": { "x_m": null, "y_m": null, "theta_deg": null }, "incertitude_1sigma": { "x_m": null, "y_m": null, "theta_deg": null }, "lectures_repetees": [], "pose_initiale_commune": null, "observable_avant_test": null, "sha256_scan": null, "notes": "" }
+  ],
+  "environnement": {
+    "date_heure": null,
+    "portes_fenetres": null,
+    "mobilier": null,
+    "personnes_en_mouvement": null,
+    "surfaces_vitrees": null,
+    "hauteur_lidar_m": null,
+    "etat_robot": null,
+    "notes": ""
+  }
+}
