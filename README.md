@@ -72,6 +72,8 @@ ESP32 + LD06  <-- HTTP / Wi-Fi -->  serveur_robot/serveur.js  <-->  navigateur :
 | Fausses poses de l'assemblage (600 scans simulés jamais utilisés pour le réglage) | 255 → 48 → 2 avec les règles d'ambiguïté et d'espace libre |
 | Exploration sur robot simulé (salle jamais vue) | 0 collision, 95 à 96 % de la salle cartographiée |
 
+![Grid map de la salle (séance du 10/11, 48 scans)](docs/images/grid_map_10_11.png)
+
 ![Carte vectorielle de la salle (séance du 10/11, 58 segments)](docs/images/carte_vectorielle_10_11.png)
 
 ## Documentation
