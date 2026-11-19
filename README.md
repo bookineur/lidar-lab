@@ -67,12 +67,12 @@ ESP32 + LD06  <-- HTTP / Wi-Fi -->  serveur_robot/serveur.js  <-->  navigateur :
 
 | Expérience | Résultat |
 |---|---|
-| Séance réelle du 10/11 (49 scans) | 48 scans recalés par l'Auto-SLAM ; carte complète de la salle (environ 13 × 12 m) |
+| Séance réelle du 10/11 (49 scans) | 48 scans recalés par l'Auto-SLAM ; carte complète de la salle (environ 13 × 10 m) |
 | Localisation d'un scan sans position de départ (48 scans réels) | 42 retrouvés, 0 fausse position, écart médian 2,5 cm avec l'Auto-SLAM |
 | Fausses poses de l'assemblage (600 scans simulés jamais utilisés pour le réglage) | 255 → 48 → 2 avec les règles d'ambiguïté et d'espace libre |
 | Exploration sur robot simulé (salle jamais vue) | 0 collision, 95 à 96 % de la salle cartographiée |
 
-![Carte vectorielle](docs/images/lidarlab_couche_vectorielle.png)
+![Carte vectorielle de la salle (séance du 10/11, 58 segments)](docs/images/carte_vectorielle_10_11.png)
 
 ## Documentation
 
