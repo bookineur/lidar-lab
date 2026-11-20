@@ -6,7 +6,7 @@ et faire explorer la salle au robot. Projet réalisé dans le cadre du module «
 localisation appliquée à la robotique mobile ».
 
 C'est l'**outil 2** du projet ; l'outil 1 (bibliothèque Python *carto*, Lidar Plot et banc d'évaluation)
-est dans un dépôt séparé. Les deux outils lisent et écrivent les mêmes fichiers.
+est dans un dépôt séparé ([bookineur/TP-cartographie](https://github.com/bookineur/TP-cartographie)), avec le rapport final et les vidéos du TP. Les deux outils lisent et écrivent les mêmes fichiers.
 
 ![Lidar Lab : un scan tiré au hasard est retrouvé sur la grid map, sans position de départ](docs/images/lidarlab_demo_localisation.png)
 
